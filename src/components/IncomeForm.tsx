@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { useAppContext } from "../context/AppContext";
-import { Income, IncomeFrequency } from "../types";
+import { Income, Frequency, IncomeFormData } from "../types";
 import Card from "./cards/Card";
 import Button from "./buttons/Button";
 
 interface IncomeFormProps {
   initialIncome?: Income;
   onSubmit?: () => void;
+  addIncome: (income: IncomeFormData) => Promise<any>;
+  updateIncome: (income: Income) => Promise<any>;
+  deselectIncome: () => void;
 }
 
-const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
-  const { addIncome, updateIncome } = useAppContext();
-
+const IncomeForm: React.FC<IncomeFormProps> = ({
+  initialIncome,
+  onSubmit,
+  addIncome,
+  updateIncome,
+  deselectIncome,
+}) => {
   const [name, setName] = useState(initialIncome?.name || "");
   const [grossAmount, setGrossAmount] = useState(
     initialIncome?.grossAmount || 0
@@ -21,14 +27,15 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
   const [isRecurring, setIsRecurring] = useState<boolean>(
     initialIncome?.isRecurring || true
   );
-  const [frequency, setFrequency] = useState<IncomeFrequency>(
-    initialIncome?.frequency || IncomeFrequency.MONTHLY
+  const [frequency, setFrequency] = useState<Frequency>(
+    initialIncome?.frequency || Frequency.MONTHLY
   );
   const [category, setCategory] = useState(initialIncome?.type || "Salary");
   const [date, setDate] = useState(
     initialIncome?.date || new Date().toISOString().split("T")[0]
   );
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Calculate net amount when gross amount or tax rate changes
   useEffect(() => {
@@ -41,7 +48,6 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
     if (initialIncome) {
       console.log("Initializing form with income:", initialIncome);
       setName(initialIncome.name);
-      // If we have grossAmount, use it, otherwise fall back to amount (for backward compatibility)
       setGrossAmount(initialIncome.grossAmount);
       setTaxRate(initialIncome.taxRate || 30);
       setNetAmount(initialIncome.netAmount);
@@ -59,7 +65,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
     setGrossAmount(Math.round(calculatedGrossAmount * 100) / 100);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -82,50 +88,61 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
       return;
     }
 
-    const incomeData = {
-      name,
-      amount: grossAmount.toString(), // For form compatibility
-      grossAmount: grossAmount.toString(),
-      netAmount: netAmount.toString(),
-      taxRate: taxRate.toString(),
-      frequency,
-      category,
-      isRecurring,
-      date,
-    };
+    setIsSubmitting(true);
+    setError("");
 
-    console.log("Form submitted with data:", incomeData);
+    try {
+      const incomeData: IncomeFormData = {
+        name,
+        grossAmount,
+        netAmount,
+        taxRate,
+        frequency,
+        type: category,
+        isRecurring,
+        date,
+      };
 
-    // Convert form data to the format expected by addIncome
-    addIncome({
-      name,
-      grossAmount: parseFloat(grossAmount.toString()),
-      netAmount: parseFloat(netAmount.toString()),
-      taxRate: parseFloat(taxRate.toString()),
-      frequency,
-      type: category,
-      isRecurring,
-      date,
-    });
+      console.log("Form submitted with data:", incomeData);
 
-    // Reset form
-    if (!initialIncome) {
+      if (initialIncome) {
+        const incomeToUpdate: Income = {
+          ...incomeData,
+          _id: initialIncome._id,
+          updatedAt: initialIncome.updatedAt,
+          createdAt: initialIncome.createdAt,
+        };
+
+        await updateIncome(incomeToUpdate);
+      } else {
+        await addIncome(incomeData);
+      }
+
+      // Reset form
       setName("");
       setGrossAmount(0);
       setTaxRate(23);
       setNetAmount(0);
       setIsRecurring(true);
-      setFrequency(IncomeFrequency.MONTHLY);
+      setFrequency(Frequency.MONTHLY);
       setCategory("Salary");
       setDate(new Date().toISOString().split("T")[0]);
-    }
 
-    setError("");
-    if (onSubmit) onSubmit();
+      if (onSubmit) onSubmit();
+    } catch (err) {
+      console.error("Error submitting income:", err);
+      setError("Failed to save income. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Card variant="default" size="lg" className="mb-6">
+      <h2 className="text-xl font-semibold mb-4">
+        {initialIncome ? "Edit Income" : "Add New Income"}
+      </h2>
+
       <form onSubmit={handleSubmit}>
         {error && (
           <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -254,14 +271,12 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
                 id="frequency"
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 value={frequency}
-                onChange={(e) =>
-                  setFrequency(e.target.value as IncomeFrequency)
-                }
+                onChange={(e) => setFrequency(e.target.value as Frequency)}
               >
-                <option value={IncomeFrequency.MONTHLY}>Monthly</option>
-                <option value={IncomeFrequency.WEEKLY}>Weekly</option>
-                <option value={IncomeFrequency.BIWEEKLY}>Bi-weekly</option>
-                <option value={IncomeFrequency.DAILY}>Daily</option>
+                <option value={Frequency.MONTHLY}>Monthly</option>
+                <option value={Frequency.WEEKLY}>Weekly</option>
+                <option value={Frequency.BIWEEKLY}>Bi-weekly</option>
+                <option value={Frequency.DAILY}>Daily</option>
               </select>
             </div>
           )}
@@ -301,9 +316,34 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
         </div>
 
         <div className="flex items-center justify-between mt-6">
-          <Button type="submit" variant="primary" size="md">
+          <Button
+            type="submit"
+            variant="primary"
+            isLoading={isSubmitting}
+            disabled={isSubmitting}
+          >
             {initialIncome ? "Update Income" : "Add Income"}
           </Button>
+
+          {initialIncome && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setName("");
+                setGrossAmount(0);
+                setTaxRate(23);
+                setNetAmount(0);
+                setIsRecurring(true);
+                setFrequency(Frequency.MONTHLY);
+                setCategory("Salary");
+                setDate(new Date().toISOString().split("T")[0]);
+                deselectIncome();
+              }}
+            >
+              Cancel
+            </Button>
+          )}
         </div>
       </form>
     </Card>

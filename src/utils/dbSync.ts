@@ -1,5 +1,20 @@
 import { apiRequest } from "../services/api";
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  isSetupComplete: boolean;
+  incomes: any[]; // Define more specifically if needed
+  expenses: any[]; // Define more specifically if needed
+  assets: any[]; // Define more specifically if needed
+  liabilities: any[]; // Define more specifically if needed
+  subscriptions: any[];
+  createdAt: string; // Date as string, can be Date type if necessary
+  updatedAt: string; // Date as string, can be Date type if necessary
+  __v: number;
+}
+
 /**
  * Fetches user data from MongoDB and returns it
  * @returns Promise containing all user data
@@ -12,30 +27,22 @@ export const fetchUserDataFromMongoDB = async () => {
     expenses: [],
     assets: [],
     liabilities: [],
+    subscriptions: [],
   };
 
   try {
     // Fetch all user data from the consolidated endpoint
     console.log("📥 dbSync: Fetching user data from consolidated endpoint...");
-    const userData = await apiRequest("/api/user-data", "GET");
-
-    // Extract data from the response
-    results.incomes = userData.incomes || [];
-    results.expenses = userData.expenses || [];
-    results.assets = userData.assets || [];
-    results.liabilities = userData.liabilities || [];
+    const userData: User = await apiRequest("/api/user-data", "GET");
 
     console.log("✅ dbSync: Completed fetching data from MongoDB", {
-      incomesCount: results.incomes.length,
-      expensesCount: results.expenses.length,
-      assetsCount: results.assets.length,
-      liabilitiesCount: results.liabilities.length,
+      userData,
     });
 
     return results;
   } catch (error) {
     console.error("❌ dbSync: Error in fetchUserDataFromMongoDB", error);
-    return results; // Return empty arrays instead of throwing
+    return results;
   }
 };
 
@@ -44,48 +51,28 @@ export const fetchUserDataFromMongoDB = async () => {
  * @param setters Object containing state setter functions
  */
 export const syncUserDataFromMongoDB = async (setters: {
-  setIncomes?: (data: any[]) => void;
-  setExpenses?: (data: any[]) => void;
-  setAssets?: (data: any[]) => void;
-  setLiabilities?: (data: any[]) => void;
+  setIncomes: (data: any[]) => void;
+  setExpenses: (data: any[]) => void;
+  setAssets: (data: any[]) => void;
+  setLiabilities: (data: any[]) => void;
 }) => {
   console.log("🔄 dbSync: Syncing user data from MongoDB to app state");
 
   try {
-    const data = await fetchUserDataFromMongoDB();
+    const data: User = await apiRequest("/api/user-data", "GET");
 
     // Update app state with fetched data
-    if (setters.setIncomes && data.incomes.length > 0) {
-      console.log(
-        "💾 dbSync: Updating incomes in app state",
-        data.incomes.length
-      );
-      setters.setIncomes(data.incomes);
-    }
+    console.log("💾 dbSync: Updating incomes in app state");
+    setters.setIncomes(data.incomes);
 
-    if (setters.setExpenses && data.expenses.length > 0) {
-      console.log(
-        "💾 dbSync: Updating expenses in app state",
-        data.expenses.length
-      );
-      setters.setExpenses(data.expenses);
-    }
+    console.log("💾 dbSync: Updating expenses in app state");
+    setters.setExpenses(data.expenses);
 
-    if (setters.setAssets && data.assets.length > 0) {
-      console.log(
-        "💾 dbSync: Updating assets in app state",
-        data.assets.length
-      );
-      setters.setAssets(data.assets);
-    }
+    console.log("💾 dbSync: Updating assets in app state");
+    setters.setAssets(data.assets);
 
-    if (setters.setLiabilities && data.liabilities.length > 0) {
-      console.log(
-        "💾 dbSync: Updating liabilities in app state",
-        data.liabilities.length
-      );
-      setters.setLiabilities(data.liabilities);
-    }
+    console.log("💾 dbSync: Updating liabilities in app state");
+    setters.setLiabilities(data.liabilities);
 
     return data;
   } catch (error) {

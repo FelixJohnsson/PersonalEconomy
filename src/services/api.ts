@@ -2,14 +2,7 @@
  * API Service
  * This service handles all API requests to the backend
  */
-import {
-  Income,
-  Expense,
-  Asset,
-  Liability,
-  AssetValue,
-  AssetDeposit,
-} from "../types";
+import { Income, Asset, IncomeFormData } from "../types";
 
 // API base URL - make sure it doesn't end with /api
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5003";
@@ -55,6 +48,8 @@ export const apiRequest = async (
       hasToken: !!token,
       hasData: !!data,
     });
+
+    console.log("Request data:", data);
 
     const response = await fetch(requestUrl, config);
     const responseData = await response.json();
@@ -123,9 +118,9 @@ export const userApi = {
 export const incomeApi = {
   getIncomes: () =>
     apiRequest("/api/user-data", "GET").then((data) => data.incomes),
-  createIncome: (incomeData: Omit<Income, "_id">): Promise<Income> =>
+  createIncome: (incomeData: IncomeFormData): Promise<Income> =>
     apiRequest("/api/user-data/incomes", "POST", incomeData),
-  updateIncome: (id: string, incomeData: Partial<Income>) =>
+  updateIncome: (id: string, incomeData: Partial<Income>): Promise<Income[]> =>
     apiRequest(`/api/user-data/incomes/${id}`, "PUT", incomeData),
   deleteIncome: (id: string) =>
     apiRequest(`/api/user-data/incomes/${id}`, "DELETE"),

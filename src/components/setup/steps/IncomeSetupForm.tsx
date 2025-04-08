@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import Button from "../../buttons/Button";
 import Card from "../../cards/Card";
+import { Income } from "../../../types";
 
 interface IncomeSetupFormProps {
   onNext: () => void;
@@ -44,20 +45,7 @@ const IncomeSetupForm: React.FC<IncomeSetupFormProps> = ({
   onBack,
 }) => {
   const { addIncome, incomes, deleteIncome } = useAppContext();
-  const [incomeItems, setIncomeItems] = useState<IncomeFormData[]>(
-    incomes.length > 0
-      ? incomes.map((income) => ({
-          name: income.name,
-          amount: income.amount.toString(),
-          grossAmount: (income.grossAmount || income.amount).toString(),
-          netAmount: (income.netAmount || income.amount).toString(),
-          taxRate: income.taxRate || 30,
-          frequency: income.frequency,
-          category: income.category,
-          id: income.id,
-        }))
-      : [{ ...initialIncome }]
-  );
+  const [incomeItems, setIncomeItems] = useState<Income[]>(incomes);
   const [currentIncomeIndex, setCurrentIncomeIndex] = useState<number>(0);
   const isSubmitting = useRef(false);
 
@@ -65,7 +53,7 @@ const IncomeSetupForm: React.FC<IncomeSetupFormProps> = ({
   useEffect(() => {
     const currentItem = incomeItems[currentIncomeIndex];
     if (currentItem) {
-      const grossAmount = parseFloat(currentItem.grossAmount) || 0;
+      const grossAmount = currentItem.grossAmount;
       const taxRate = currentItem.taxRate || 30;
 
       // Only update if we have valid numbers
@@ -75,17 +63,13 @@ const IncomeSetupForm: React.FC<IncomeSetupFormProps> = ({
         const updatedItems = [...incomeItems];
         updatedItems[currentIncomeIndex] = {
           ...currentItem,
-          netAmount: netAmount.toFixed(2),
-          amount: netAmount.toFixed(2), // For backward compatibility
+          netAmount: netAmount,
         };
 
         setIncomeItems(updatedItems);
       }
     }
-  }, [
-    incomeItems[currentIncomeIndex]?.grossAmount,
-    incomeItems[currentIncomeIndex]?.taxRate,
-  ]);
+  }, [currentIncomeIndex, incomeItems]);
 
   // Handle form input changes
   const handleChange = (
@@ -123,9 +107,8 @@ const IncomeSetupForm: React.FC<IncomeSetupFormProps> = ({
       const updatedItems = [...incomeItems];
       updatedItems[currentIncomeIndex] = {
         ...updatedItems[currentIncomeIndex],
-        netAmount: value,
-        amount: value, // For backward compatibility
-        grossAmount: grossAmount.toFixed(2),
+        netAmount: netAmount,
+        grossAmount: grossAmount,
       };
 
       setIncomeItems(updatedItems);
@@ -134,6 +117,7 @@ const IncomeSetupForm: React.FC<IncomeSetupFormProps> = ({
 
   // Add a new income item form
   const addIncomeItem = () => {
+    // @ts-ignore
     setIncomeItems([...incomeItems, { ...initialIncome }]);
     setCurrentIncomeIndex(incomeItems.length);
   };
@@ -143,12 +127,12 @@ const IncomeSetupForm: React.FC<IncomeSetupFormProps> = ({
     const item = incomeItems[index];
 
     // If the item has an ID, it exists in the context, so delete it
-    if (item.id) {
-      deleteIncome(item.id);
+    if (item._id) {
+      deleteIncome(item._id);
     }
 
     if (incomeItems.length === 1) {
-      // If it's the last item, just clear it
+      // @ts-ignore
       setIncomeItems([{ ...initialIncome }]);
       setCurrentIncomeIndex(0);
       return;
@@ -174,23 +158,13 @@ const IncomeSetupForm: React.FC<IncomeSetupFormProps> = ({
     // Save all valid income items
     const validIncomes = incomeItems.filter(
       (item) =>
-        item.name.trim() !== "" &&
-        (parseFloat(item.grossAmount) > 0 || parseFloat(item.netAmount) > 0)
+        item.name.trim() !== "" && (item.grossAmount > 0 || item.netAmount > 0)
     );
 
     // Add new incomes (only if they don't have an ID)
     validIncomes.forEach((item) => {
-      if (!item.id) {
-        addIncome({
-          name: item.name,
-          // Use netAmount as amount for backward compatibility
-          amount: parseFloat(item.netAmount || item.amount),
-          grossAmount: parseFloat(item.grossAmount),
-          netAmount: parseFloat(item.netAmount || item.amount),
-          taxRate: item.taxRate,
-          frequency: item.frequency,
-          category: item.category || "Salary",
-        });
+      if (!item._id) {
+        addIncome(item);
       }
     });
 
@@ -363,7 +337,7 @@ const IncomeSetupForm: React.FC<IncomeSetupFormProps> = ({
               <select
                 id="category"
                 name="category"
-                value={incomeItems[currentIncomeIndex]?.category || "Salary"}
+                value={incomeItems[currentIncomeIndex]?.type || "Salary"}
                 onChange={
                   handleChange as React.ChangeEventHandler<HTMLSelectElement>
                 }

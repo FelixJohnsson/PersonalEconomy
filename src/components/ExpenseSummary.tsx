@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { useAppContext } from "../context/AppContext";
-import { Period, Expense } from "../types";
+import { useExpenses } from "../hooks/useExpenses";
+import { Expense } from "../types";
 import { formatCurrency } from "../utils/formatters";
 
 interface ExpenseSummaryProps {
-  period?: Period;
+  period?: Record<string, string>;
 }
 
 interface CategorySummary {
@@ -16,20 +16,15 @@ interface CategorySummary {
 const ExpenseSummary: React.FC<ExpenseSummaryProps> = ({
   period: propPeriod,
 }) => {
-  const { expenses } = useAppContext();
-
-  // Create default period from 25th of last month to 25th of current month
-  const [period, setPeriod] = useState<Period>(() => {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-
-    // Start date: 25th of previous month
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  const { expenses } = useExpenses();
+  const [period, setPeriod] = useState<Record<string, string>>(() => {
     const startMonth = currentMonth === 0 ? 11 : currentMonth - 1;
     const startYear = currentMonth === 0 ? currentYear - 1 : currentYear;
     const startDate = new Date(startYear, startMonth, 25 + 1);
 
-    // End date: 25th of current month or today if before 25th
     const endDate = new Date(currentYear, currentMonth, 25 + 1);
 
     return {

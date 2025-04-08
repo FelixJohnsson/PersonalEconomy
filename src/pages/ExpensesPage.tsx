@@ -1,236 +1,65 @@
-import React, { useState, useMemo } from "react";
-import { useAppContext } from "../context/AppContext";
+import React from "react";
 import ExpenseForm from "../components/ExpenseForm";
 import ExpenseSummary from "../components/ExpenseSummary";
 import { formatCurrency } from "../utils/formatters";
-import { NecessityLevel, EXPENSE_CATEGORIES } from "../types";
-
-// Define sort options
-type SortField =
-  | "name"
-  | "amount"
-  | "category"
-  | "necessityLevel"
-  | "frequency"
-  | "date";
-type SortDirection = "asc" | "desc";
+import { useExpenses } from "../hooks/useExpenses";
 
 const ExpensesPage: React.FC = () => {
-  const { expenses, deleteExpense, getAllCategories } = useAppContext();
-  const [selectedExpense, setSelectedExpense] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [showNotes, setShowNotes] = useState<boolean>(false);
-  const [sortField, setSortField] = useState<SortField>("name");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const {
+    sortedExpenses,
+    categories,
+    selectedExpense,
+    categoryTotals,
+    isLoading,
+    error,
+    selectedId,
+    selectedCategory,
+    showNotes,
+    sortField,
+    sortDirection,
+    setSelectedId,
+    setSelectedCategory,
+    setShowNotes,
+    deleteExpense,
+    addExpense,
+    updateExpense,
+    handleSort,
+    getCategoryColor,
+    getNecessityLevelColor,
+    formatExpenseDate,
+  } = useExpenses();
 
-  // Get all unique categories and prioritize the predefined ones
-  const categories = useMemo(() => {
-    const allCategories = getAllCategories();
-
-    // Move predefined categories to the top
-    const predefinedCategories = EXPENSE_CATEGORIES.filter((cat) =>
-      allCategories.includes(cat)
+  // Show loading indicator while data is being fetched
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading expense data...</p>
+        </div>
+      </div>
     );
+  }
 
-    // Add custom categories (those not in predefined list)
-    const customCategories = allCategories.filter(
-      (cat) => !EXPENSE_CATEGORIES.includes(cat as any)
+  // Show error message if data fetching failed
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <p className="text-red-600 font-bold mb-2">
+            Error loading expense data
+          </p>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
     );
-
-    return [...predefinedCategories, ...customCategories];
-  }, [getAllCategories]);
-
-  // Filter expenses by selected category
-  const filteredExpenses = useMemo(() => {
-    if (selectedCategory === "all") {
-      return expenses;
-    }
-    return expenses.filter((expense) => expense.category === selectedCategory);
-  }, [expenses, selectedCategory]);
-
-  // Sort expenses
-  const sortedExpenses = useMemo(() => {
-    const expensesCopy = [...filteredExpenses];
-
-    // Define sorting functions
-    const compareStrings = (a: string, b: string) => a.localeCompare(b);
-    const compareNumbers = (a: number, b: number) => a - b;
-    const compareDates = (a: string | undefined, b: string | undefined) => {
-      // Handle undefined dates
-      if (!a && !b) return 0;
-      if (!a) return -1;
-      if (!b) return 1;
-      return new Date(a).getTime() - new Date(b).getTime();
-    };
-    const compareBooleans = (a: boolean, b: boolean) =>
-      a === b ? 0 : a ? -1 : 1;
-
-    // Define necessity level order for sorting
-    const necessityLevelOrder: { [key in NecessityLevel]: number } = {
-      "A+": 7,
-      A: 6,
-      B: 5,
-      C: 4,
-      D: 3,
-      E: 2,
-      F: 1,
-    };
-
-    // Sort based on selected field
-    expensesCopy.sort((a, b) => {
-      let result = 0;
-
-      switch (sortField) {
-        case "name":
-          result = compareStrings(a.name, b.name);
-          break;
-        case "amount":
-          result = compareNumbers(a.amount, b.amount);
-          break;
-        case "category":
-          result = compareStrings(a.category, b.category);
-          break;
-        case "frequency":
-          // Handle undefined frequency (for non-recurring expenses)
-          if (!a.isRecurring && !b.isRecurring) {
-            result = 0; // Both are one-time, so equal
-          } else if (!a.isRecurring) {
-            result = -1; // One-time comes before recurring
-          } else if (!b.isRecurring) {
-            result = 1; // Recurring comes after one-time
-          } else {
-            // Both are recurring, compare frequency
-            result = compareStrings(
-              a.frequency || "monthly",
-              b.frequency || "monthly"
-            );
-          }
-          break;
-        case "date":
-          result = compareDates(a.date, b.date);
-          break;
-        case "necessityLevel":
-          // Handle cases where necessityLevel might be undefined
-          if (!a.necessityLevel && !b.necessityLevel) {
-            result = 0;
-          } else if (!a.necessityLevel) {
-            result = -1;
-          } else if (!b.necessityLevel) {
-            result = 1;
-          } else {
-            result =
-              necessityLevelOrder[b.necessityLevel] -
-              necessityLevelOrder[a.necessityLevel];
-          }
-          break;
-        default:
-          // First sort by recurring status, then by name as a fallback
-          result = compareBooleans(a.isRecurring, b.isRecurring);
-          if (result === 0) {
-            result = compareStrings(a.name, b.name);
-          }
-      }
-
-      // Apply sort direction
-      return sortDirection === "asc" ? result : -result;
-    });
-
-    return expensesCopy;
-  }, [filteredExpenses, sortField, sortDirection]);
-
-  const handleDelete = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this expense?")) {
-      deleteExpense(id);
-      if (selectedExpense === id) {
-        setSelectedExpense(null);
-      }
-    }
-  };
-
-  // Handle sort change
-  const handleSort = (field: SortField) => {
-    if (field === sortField) {
-      // Toggle direction if clicking the same field
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      // Set new field and default to ascending
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  // Calculate totals
-  const categoryTotals = useMemo(() => {
-    const totals: { [key: string]: { monthly: number; annual: number } } = {};
-
-    expenses.forEach((expense) => {
-      if (!totals[expense.category]) {
-        totals[expense.category] = { monthly: 0, annual: 0 };
-      }
-
-      if (expense.frequency === "monthly") {
-        totals[expense.category].monthly += expense.amount;
-        totals[expense.category].annual += expense.amount * 12;
-      } else {
-        totals[expense.category].monthly += expense.amount;
-        totals[expense.category].annual += expense.amount;
-      }
-    });
-
-    return totals;
-  }, [expenses]);
-
-  // Get a color based on category
-  const getCategoryColor = (category: string): string => {
-    // Simple color hash function
-    let hash = 0;
-    for (let i = 0; i < category.length; i++) {
-      hash = category.charCodeAt(i) + ((hash << 5) - hash);
-    }
-
-    // Convert to hex color
-    const c = (hash & 0x00ffffff).toString(16).toUpperCase();
-
-    return "#" + "00000".substring(0, 6 - c.length) + c;
-  };
-
-  // Get color for necessity level
-  const getNecessityLevelColor = (level?: NecessityLevel) => {
-    switch (level) {
-      case "A+":
-        return "bg-green-100 text-green-800";
-      case "A":
-        return "bg-green-100 text-green-800";
-      case "B":
-        return "bg-blue-100 text-blue-800";
-      case "C":
-        return "bg-yellow-100 text-yellow-800";
-      case "D":
-        return "bg-orange-100 text-orange-800";
-      case "E":
-        return "bg-red-100 text-red-800";
-      case "F":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  }
 
   // Render sort indicator
-  const renderSortIndicator = (field: SortField) => {
+  const renderSortIndicator = (field: string) => {
     if (sortField !== field) return null;
     return <span className="ml-1">{sortDirection === "asc" ? "↑" : "↓"}</span>;
-  };
-
-  // Format date
-  const formatExpenseDate = (dateString?: string): string => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
   };
 
   return (
@@ -264,9 +93,7 @@ const ExpensesPage: React.FC = () => {
                     <option value="all">All Categories</option>
                     {categories.map((category) => (
                       <option key={category} value={category}>
-                        {EXPENSE_CATEGORIES.includes(category as any)
-                          ? category
-                          : `${category} (Custom)`}
+                        {category}
                       </option>
                     ))}
                   </select>
@@ -340,7 +167,7 @@ const ExpensesPage: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {sortedExpenses.map((expense) => (
-                      <React.Fragment key={expense.id}>
+                      <React.Fragment key={expense._id}>
                         <tr>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
@@ -372,7 +199,7 @@ const ExpensesPage: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             {expense.isRecurring
-                              ? expense.frequency === "annual"
+                              ? expense.frequency === "yearly"
                                 ? "Yearly"
                                 : "Monthly"
                               : "One-time"}
@@ -395,32 +222,19 @@ const ExpensesPage: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
-                              onClick={() => setSelectedExpense(expense.id)}
+                              onClick={() => setSelectedId(expense._id)}
                               className="text-blue-600 hover:text-blue-900 mr-4"
                             >
                               Edit
                             </button>
                             <button
-                              onClick={() => handleDelete(expense.id)}
+                              onClick={() => deleteExpense(expense._id)}
                               className="text-red-600 hover:text-red-900"
                             >
                               Delete
                             </button>
                           </td>
                         </tr>
-                        {showNotes && expense.notes && (
-                          <tr className="bg-gray-50">
-                            <td
-                              colSpan={6}
-                              className="px-6 py-2 text-sm text-gray-500"
-                            >
-                              <div className="flex items-start">
-                                <span className="font-medium mr-2">Notes:</span>
-                                <span>{expense.notes}</span>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
                       </React.Fragment>
                     ))}
                   </tbody>
@@ -484,15 +298,14 @@ const ExpensesPage: React.FC = () => {
         <div>
           <div className="bg-white shadow-md rounded p-6">
             <h2 className="text-xl font-semibold mb-4">
-              {selectedExpense ? "Edit Expense" : "Add New Expense"}
+              {selectedId ? "Edit Expense" : "Add New Expense"}
             </h2>
             <ExpenseForm
-              initialExpense={
-                selectedExpense
-                  ? expenses.find((e) => e.id === selectedExpense)
-                  : undefined
-              }
-              onSubmit={() => setSelectedExpense(null)}
+              initialExpense={selectedExpense}
+              onSubmit={() => setSelectedId(null)}
+              addExpense={addExpense}
+              updateExpense={updateExpense}
+              deselectExpense={() => setSelectedId(null)}
             />
           </div>
         </div>

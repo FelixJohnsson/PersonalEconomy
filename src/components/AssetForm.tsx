@@ -1,63 +1,121 @@
 import React, { useState, useEffect } from "react";
-import { Asset, AssetCategory } from "../types";
+import { Asset, AssetCategory, AssetFormData } from "../types";
 import FormInput from "./forms/FormInput";
-import { useAppContext } from "../context/AppContext";
+import Button from "./buttons/Button";
 
 interface AssetFormProps {
   initialAsset?: Asset;
   onSubmit: () => void;
+  addAsset: (asset: AssetFormData) => Promise<any>;
+  updateAsset: (asset: Asset) => Promise<any>;
+  deselectAsset: () => void;
 }
 
-const AssetForm: React.FC<AssetFormProps> = ({ initialAsset, onSubmit }) => {
-  const { addAsset, updateAsset, savingsGoals } = useAppContext();
-  const [formData, setFormData] = useState({
-    name: initialAsset?.name || "",
-    type: initialAsset?.type || "cash",
-    value: initialAsset?.value || 0,
-    savingsGoalId: initialAsset?.savingsGoalId || "",
-  });
+const AssetForm: React.FC<AssetFormProps> = ({
+  initialAsset,
+  onSubmit,
+  addAsset,
+  updateAsset,
+  deselectAsset,
+}) => {
+  const [name, setName] = useState(initialAsset?.name || "");
+  const [type, setType] = useState(initialAsset?.type || "cash");
+  const [value, setValue] = useState(initialAsset?.value || 0);
+  const [savingsGoalId, setSavingsGoalId] = useState(
+    initialAsset?.savingsGoalId || ""
+  );
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (initialAsset) {
-      setFormData({
-        name: initialAsset.name,
-        type: initialAsset.type,
-        value: initialAsset.value,
-        savingsGoalId: initialAsset.savingsGoalId || "",
-      });
+      setName(initialAsset.name);
+      setType(initialAsset.type);
+      setValue(initialAsset.value);
+      setSavingsGoalId(initialAsset.savingsGoalId || "");
     }
   }, [initialAsset]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const today = new Date().toISOString().split("T")[0];
 
-    const assetData: Omit<Asset, "id"> = {
-      ...formData,
-      historicalValues: initialAsset?.historicalValues || [
-        { date: today, value: formData.value },
-      ],
-      totalDeposits: initialAsset?.totalDeposits || formData.value,
-    };
+    console.log("Form submitted with data:", {
+      name,
+      type,
+      value,
+      savingsGoalId,
+    });
 
-    if (initialAsset) {
-      updateAsset({ ...assetData, id: initialAsset.id });
-    } else {
-      addAsset(assetData);
+    if (!name.trim()) {
+      setError("Please enter an income name");
+      return;
     }
 
-    onSubmit();
+    if (value <= 0) {
+      setError("Value must be greater than 0");
+      return;
+    }
+
+    if (!type.trim()) {
+      setError("Please enter a type");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const assetData: AssetFormData = {
+        name,
+        type,
+        value,
+        savingsGoalId,
+      };
+
+      console.log("Form submitted with data:", assetData);
+
+      if (initialAsset) {
+        const assetToUpdate: Asset = {
+          ...assetData,
+          _id: initialAsset._id,
+          updatedAt: initialAsset.updatedAt,
+          createdAt: initialAsset.createdAt,
+        };
+
+        console.log("Asset to update:", assetToUpdate);
+
+        await updateAsset(assetToUpdate);
+      } else {
+        await addAsset(assetData);
+      }
+
+      // Reset form
+      setName("");
+      setType("cash");
+      setValue(0);
+      setSavingsGoalId("");
+
+      if (onSubmit) onSubmit();
+    } catch (err) {
+      console.error("Error submitting asset:", err);
+      setError("Failed to save asset. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
       <FormInput
         label="Asset Name"
         name="name"
-        value={formData.name}
-        onChange={(e) =>
-          setFormData((prev) => ({ ...prev, name: e.target.value }))
-        }
+        value={name}
+        onChange={(e) => setName(e.target.value)}
         required
       />
 
@@ -67,13 +125,8 @@ const AssetForm: React.FC<AssetFormProps> = ({ initialAsset, onSubmit }) => {
         </label>
         <select
           name="type"
-          value={formData.type}
-          onChange={(e) =>
-            setFormData((prev) => ({
-              ...prev,
-              type: e.target.value as AssetCategory,
-            }))
-          }
+          value={type}
+          onChange={(e) => setType(e.target.value)}
           className="border border-gray-300 rounded-md p-2 w-full"
         >
           <option value="cash">Cash</option>
@@ -90,10 +143,8 @@ const AssetForm: React.FC<AssetFormProps> = ({ initialAsset, onSubmit }) => {
         label="Value"
         name="value"
         type="number"
-        value={formData.value}
-        onChange={(e) =>
-          setFormData((prev) => ({ ...prev, value: Number(e.target.value) }))
-        }
+        value={value}
+        onChange={(e) => setValue(Number(e.target.value))}
         required
         min={0}
         step={0.01}
@@ -105,27 +156,27 @@ const AssetForm: React.FC<AssetFormProps> = ({ initialAsset, onSubmit }) => {
         </label>
         <select
           name="savingsGoalId"
-          value={formData.savingsGoalId}
-          onChange={(e) =>
-            setFormData((prev) => ({ ...prev, savingsGoalId: e.target.value }))
-          }
+          value={savingsGoalId}
+          onChange={(e) => setSavingsGoalId(e.target.value)}
           className="border border-gray-300 rounded-md p-2 w-full"
         >
           <option value="">None</option>
-          {savingsGoals.map((goal) => (
+          {/*savingsGoals.map((goal) => (
             <option key={goal.id} value={goal.id}>
               {goal.name}
             </option>
-          ))}
+          ))}*/}
         </select>
       </div>
 
-      <button
+      <Button
         type="submit"
+        isLoading={isSubmitting}
+        disabled={isSubmitting}
         className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600"
       >
         {initialAsset ? "Update Asset" : "Add Asset"}
-      </button>
+      </Button>
     </form>
   );
 };

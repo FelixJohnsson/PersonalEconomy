@@ -1,8 +1,7 @@
 import React from "react";
-import { Period } from "../../types";
 
 interface DateRangeSelectorProps {
-  period: Period;
+  period: Record<string, string>;
   onChange: (dateType: "startDate" | "endDate", value: string) => void;
   startLabel?: string;
   endLabel?: string;

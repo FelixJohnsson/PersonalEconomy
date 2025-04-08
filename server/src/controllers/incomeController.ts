@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import Income from "../models/incomeModel";
+import Income, { IncomeType } from "../models/incomeModel";
 import { IUser } from "../models/userModel";
 
 // Extend Express Request interface to include user property
@@ -46,25 +46,39 @@ const getIncome = asyncHandler(async (req: UserRequest, res: Response) => {
  * @access  Private
  */
 const createIncome = asyncHandler(async (req: UserRequest, res: Response) => {
-  const { name, amount, grossAmount, netAmount, taxRate, frequency, category } =
-    req.body;
-
-  // Validate required fields
-  if (!name || !amount || !frequency || !category) {
-    res.status(400);
-    throw new Error("Please provide all required fields");
-  }
-
-  const income = await Income.create({
-    user: req.user?._id,
+  const incomeData: IncomeType = req.body;
+  const {
     name,
-    amount,
     grossAmount,
     netAmount,
     taxRate,
     frequency,
-    category,
-  });
+    type,
+    date,
+    isRecurring,
+  } = incomeData;
+
+  // Validate required fields
+  if (
+    !name ||
+    !grossAmount ||
+    !netAmount ||
+    !taxRate ||
+    !frequency ||
+    !type ||
+    !date ||
+    !isRecurring
+  ) {
+    res.status(400);
+    throw new Error("Please provide all required fields");
+  }
+
+  const newIncomeData = {
+    user: req.user?._id,
+    ...incomeData,
+  };
+
+  const income = await Income.create(newIncomeData);
 
   res.status(201).json(income);
 });
@@ -88,13 +102,13 @@ const updateIncome = asyncHandler(async (req: UserRequest, res: Response) => {
     throw new Error("Not authorized to update this income");
   }
 
-  const updatedIncome = await Income.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true, runValidators: true }
-  );
+  await Income.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
 
-  res.json(updatedIncome);
+  const allIncomes = await Income.find({ user: req.user?._id });
+  res.json(allIncomes);
 });
 
 /**

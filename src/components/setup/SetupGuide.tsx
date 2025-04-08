@@ -10,7 +10,6 @@ import LiabilitiesSetupForm from "./steps/LiabilitiesSetupForm";
 import BudgetSetupForm from "./steps/BudgetSetupForm";
 import CompleteSetup from "./steps/CompleteSetup";
 import Button from "../buttons/Button";
-import Card from "../cards/Card";
 
 // Steps for the setup process
 enum SetupStep {
@@ -24,57 +23,17 @@ enum SetupStep {
   COMPLETE = 7,
 }
 
-// Placeholder component for steps we haven't created yet
-const PlaceholderStep: React.FC<{
-  title: string;
-  description: string;
-  onNext: () => void;
-  onBack: () => void;
-}> = ({ title, description, onNext, onBack }) => {
-  return (
-    <div>
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">{title}</h2>
-      <p className="text-gray-600 mb-6">{description}</p>
-
-      <Card variant="info" size="lg" className="mb-6">
-        <p className="text-center text-gray-500 py-10">
-          This step would normally collect your {title.toLowerCase()}{" "}
-          information.
-          <br />
-          For this demo, we'll skip the actual form.
-        </p>
-      </Card>
-
-      <div className="flex justify-between">
-        <Button onClick={onBack} variant="secondary" size="md">
-          Back
-        </Button>
-        <Button onClick={onNext} variant="primary" size="md">
-          Continue
-        </Button>
-      </div>
-    </div>
-  );
-};
-
 const SetupGuide: React.FC = () => {
   const { completeSetup } = useAppContext();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<SetupStep>(SetupStep.WELCOME);
-  const [progress, setProgress] = useState<number>(0);
 
   const totalSteps = Object.keys(SetupStep).length / 2; // Enum has duplicate values (string and number)
-
-  // Update progress percentage
-  const updateProgress = (step: SetupStep) => {
-    setProgress(Math.round((step / (totalSteps - 1)) * 100));
-  };
 
   // Go to next step
   const nextStep = () => {
     const nextStep = currentStep + 1;
     setCurrentStep(nextStep);
-    updateProgress(nextStep);
   };
 
   // Go to previous step
@@ -82,7 +41,6 @@ const SetupGuide: React.FC = () => {
     if (currentStep > 0) {
       const prevStep = currentStep - 1;
       setCurrentStep(prevStep);
-      updateProgress(prevStep);
     }
   };
 

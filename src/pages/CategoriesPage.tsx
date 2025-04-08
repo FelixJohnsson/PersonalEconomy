@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useAppContext } from "../context/AppContext";
 import { formatCurrency } from "../utils/formatters";
-
+import { Frequency } from "../types";
 const CategoriesPage: React.FC = () => {
   const { expenses, incomes, subscriptions, getActiveSubscriptions } =
     useAppContext();
@@ -33,8 +33,8 @@ const CategoriesPage: React.FC = () => {
 
     // Add categories from incomes
     incomes.forEach((income) => {
-      if (income.category) {
-        allCategoriesSet.add(income.category);
+      if (income.type) {
+        allCategoriesSet.add(income.type);
       }
     });
 
@@ -74,16 +74,16 @@ const CategoriesPage: React.FC = () => {
 
     // Add income data
     incomes.forEach((income) => {
-      if (!income.category || !data[income.category]) return;
+      if (!income.type || !data[income.type]) return;
 
-      data[income.category].incomeCount++;
+      data[income.type].incomeCount++;
 
       if (income.frequency === "monthly") {
-        data[income.category].incomeTotal.monthly += income.amount;
-        data[income.category].incomeTotal.annual += income.amount * 12;
+        data[income.type].incomeTotal.monthly += income.netAmount;
+        data[income.type].incomeTotal.annual += income.netAmount * 12;
       } else {
-        data[income.category].incomeTotal.monthly += income.amount / 12;
-        data[income.category].incomeTotal.annual += income.amount;
+        data[income.type].incomeTotal.monthly += income.netAmount / 12;
+        data[income.type].incomeTotal.annual += income.netAmount;
       }
     });
 
@@ -135,7 +135,7 @@ const CategoriesPage: React.FC = () => {
 
     return {
       expenses: expenses.filter((e) => e.category === selectedCategory),
-      incomes: incomes.filter((i) => i.category === selectedCategory),
+      incomes: incomes.filter((i) => i.type === selectedCategory),
       subscriptions: subscriptions.filter(
         (s) => s.category === selectedCategory
       ),
@@ -325,11 +325,13 @@ const CategoriesPage: React.FC = () => {
                   <h3 className="text-md font-medium mb-2">Income</h3>
                   <ul className="text-sm space-y-1">
                     {categoryIncomes.map((income) => (
-                      <li key={income.id} className="flex justify-between">
+                      <li key={income._id} className="flex justify-between">
                         <span>{income.name}</span>
                         <span>
-                          {formatCurrency(income.amount)}
-                          {income.frequency === "annual" ? "/year" : "/month"}
+                          {formatCurrency(income.netAmount)}
+                          {income.frequency === Frequency.YEARLY
+                            ? "/year"
+                            : "/month"}
                         </span>
                       </li>
                     ))}
@@ -343,13 +345,13 @@ const CategoriesPage: React.FC = () => {
                   <ul className="text-sm space-y-1">
                     {categorySubscriptions.map((subscription) => (
                       <li
-                        key={subscription.id}
+                        key={subscription._id}
                         className="flex justify-between"
                       >
                         <span>{subscription.name}</span>
                         <span>
                           {formatCurrency(subscription.amount)}
-                          {subscription.frequency === "annual"
+                          {subscription.frequency === Frequency.YEARLY
                             ? "/year"
                             : "/month"}
                         </span>

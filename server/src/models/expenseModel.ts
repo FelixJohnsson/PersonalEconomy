@@ -15,6 +15,17 @@ export interface IExpense extends mongoose.Document {
   updatedAt: Date;
 }
 
+export interface ExpenseType {
+  name: string;
+  amount: number;
+  category: string;
+  isRecurring: boolean;
+  date: string;
+  necessityLevel?: string;
+  frequency?: string;
+  notes?: string;
+}
+
 const expenseSchema = new mongoose.Schema<IExpense>(
   {
     user: {

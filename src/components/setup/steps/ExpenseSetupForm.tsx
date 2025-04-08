@@ -2,12 +2,7 @@ import React, { useState, useRef } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import Button from "../../buttons/Button";
 import Card from "../../cards/Card";
-import { Expense } from "../../../types";
-import {
-  ExpenseFormData,
-  expenseFromForm,
-  expenseToForm,
-} from "../../../types/forms";
+import { Expense, ExpenseFormData, Frequency } from "../../../types";
 
 interface ExpenseSetupFormProps {
   onNext: () => void;
@@ -30,10 +25,10 @@ const expenseCategories = [
 
 const initialExpense: ExpenseFormData = {
   name: "",
-  amount: "",
+  amount: 0,
   category: "Housing",
   isRecurring: true,
-  frequency: "monthly",
+  frequency: Frequency.MONTHLY,
   date: new Date().toISOString().split("T")[0],
 };
 
@@ -110,7 +105,7 @@ const ExpenseSetupForm: React.FC<ExpenseSetupFormProps> = ({
 
     // Add new expenses (only if they don't have an ID)
     validExpenses.forEach((item) => {
-      if (!item.id) {
+      if (!item._id) {
         // Convert form data to proper expense format
         const expenseData = expenseFromForm(item);
         addExpense(expenseData);

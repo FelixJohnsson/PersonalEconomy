@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import Expense, { IExpense } from "../models/expenseModel";
+import Expense from "../models/expenseModel";
 import { IUser } from "../models/userModel";
 
 // Extend Express Request interface to include user property

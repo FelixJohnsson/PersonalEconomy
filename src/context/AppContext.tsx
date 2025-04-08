@@ -7,7 +7,6 @@ import {
   expenseApi,
   assetApi,
   liabilityApi,
-  IncomePayload,
 } from "../services/api";
 import {
   Income,
@@ -18,11 +17,12 @@ import {
   FinancialSummary,
   SavingsProjection,
   Subscription,
-  Period,
   AssetValue,
   BudgetItem,
   Note,
   TaxReturn,
+  IncomeFormData,
+  Frequency,
 } from "../types";
 
 const generateId = () => Date.now().toString();
@@ -36,14 +36,13 @@ interface AppContextType {
   assets: Asset[];
   liabilities: Liability[];
   savingsGoals: SavingsGoal[];
-  subscriptions: Subscription[];
   budgetItems: BudgetItem[];
   notes: Note[];
   taxReturns: TaxReturn[];
   isLoading: boolean;
 
   // Income methods
-  addIncome: (income: Omit<Income, "_id">) => void;
+  addIncome: (income: IncomeFormData) => void;
   updateIncome: (income: Income) => void;
   deleteIncome: (id: string) => void;
 
@@ -62,12 +61,6 @@ interface AppContextType {
   updateLiability: (liability: Liability) => void;
   deleteLiability: (id: string) => void;
 
-  // Subscription methods
-  addSubscription: (subscription: Omit<Subscription, "id">) => void;
-  updateSubscription: (subscription: Subscription) => void;
-  deleteSubscription: (id: string) => void;
-  getActiveSubscriptions: () => Subscription[];
-
   // Savings goal methods
   addSavingsGoal: (goal: Omit<SavingsGoal, "id">) => void;
   updateSavingsGoal: (goal: SavingsGoal) => void;
@@ -76,7 +69,9 @@ interface AppContextType {
   getAssetsForSavingsGoal: (goalId: string) => Asset[];
 
   // Summary methods
-  getFinancialSummary: (customPeriod?: Period) => FinancialSummary;
+  getFinancialSummary: (
+    customPeriod?: Record<string, string>
+  ) => FinancialSummary;
   calculateSavingsProjection: (goal: SavingsGoal) => SavingsProjection;
 
   // Filter methods
@@ -196,12 +191,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [user]);
 
   // Income methods
-  const addIncome = async (income: Omit<Income, "_id">) => {
+  const addIncome = async (income: IncomeFormData) => {
     try {
       if (useMongoDBData && isAuthenticated) {
         console.log("📝 AppContext: Adding income to MongoDB");
 
         const newIncome = await incomeApi.createIncome(income);
+        console.warn("New income:", newIncome);
         setIncomes([...incomes, newIncome]);
       } else {
         console.warn("Error adding income", income);
@@ -221,47 +217,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const updateIncome = async (income: Income) => {
     try {
       if (useMongoDBData && isAuthenticated) {
-        console.log(`📝 AppContext: Updating income in MongoDB: ${income.id}`);
+        console.log(`📝 AppContext: Updating income in MongoDB: ${income._id}`);
         console.log("Income object to update:", income);
 
-        // Map to API payload format
-        const incomePayload: Partial<IncomePayload> = {
-          name: income.name,
-          amount: income.amount,
-          frequency: income.frequency,
-          category: income.category,
-          date: new Date().toISOString().split("T")[0], // Use current date if not provided
-          isRecurring: false,
-        };
-
-        // Handle gross amount and tax rate if available
-        if (income.grossAmount !== undefined)
-          incomePayload.grossAmount = income.grossAmount;
-        if (income.netAmount !== undefined)
-          incomePayload.netAmount = income.netAmount;
-        if (income.taxRate !== undefined)
-          incomePayload.taxRate = income.taxRate;
-
-        // Use MongoDB _id if available, otherwise use the income.id
-        const id = (income as any)._id || income.id;
-        console.log("Using ID for update:", id);
-
-        const updatedIncome = await incomeApi.updateIncome(id, incomePayload);
-        console.log("Income after update:", updatedIncome);
-
-        // Update the local state with the returned income from MongoDB
-        setIncomes(
-          incomes.map((i) => {
-            // Compare with either _id or id
-            const matchesId =
-              String(i.id) === String(income.id) ||
-              String((i as any)._id) === String(income.id);
-
-            return matchesId ? updatedIncome : i;
-          })
-        );
-      } else {
-        setIncomes(incomes.map((i) => (i.id === income.id ? income : i)));
+        const updatedIncome = await incomeApi.updateIncome(income._id, income);
+        setIncomes(updatedIncome);
       }
     } catch (error) {
       console.error("❌ AppContext: Error updating income:", error);
@@ -274,7 +234,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log(`📝 AppContext: Deleting income from MongoDB: ${id}`);
 
         // Find the income to be deleted to check if it has _id
-        const incomeToDelete = incomes.find((i) => String(i.id) === String(id));
+        const incomeToDelete = incomes.find(
+          (i) => String(i._id) === String(id)
+        );
         if (!incomeToDelete) {
           console.error(`❌ AppContext: Income with ID ${id} not found`);
           return;
@@ -287,7 +249,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         await incomeApi.deleteIncome(mongoId);
       }
       // Remove from local state
-      setIncomes(incomes.filter((i) => String(i.id) !== String(id)));
+      setIncomes(incomes.filter((i) => String(i._id) !== String(id)));
     } catch (error) {
       console.error("❌ AppContext: Error deleting income:", error);
     }
@@ -326,21 +288,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (useMongoDBData && isAuthenticated) {
         console.log(
-          `📝 AppContext: Updating expense in MongoDB: ${updatedExpense.id}`
+          `📝 AppContext: Updating expense in MongoDB: ${updatedExpense._id}`
         );
         const result = await expenseApi.updateExpense(
-          updatedExpense.id,
+          updatedExpense._id,
           expenseWithDate
         );
         setExpenses((prev) =>
           prev.map((expense) =>
-            expense.id === updatedExpense.id ? result : expense
+            expense._id === updatedExpense._id ? result : expense
           )
         );
       } else {
         setExpenses((prev) =>
           prev.map((expense) =>
-            expense.id === updatedExpense.id ? expenseWithDate : expense
+            expense._id === updatedExpense._id ? expenseWithDate : expense
           )
         );
       }
@@ -355,7 +317,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log(`📝 AppContext: Deleting expense from MongoDB: ${id}`);
         await expenseApi.deleteExpense(id);
       }
-      setExpenses(expenses.filter((e) => e.id !== id));
+      setExpenses(expenses.filter((e) => e._id !== id));
     } catch (error) {
       console.error("❌ AppContext: Error deleting expense:", error);
     }
@@ -465,46 +427,95 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Subscription methods
-  const addSubscription = (subscription: Omit<Subscription, "id">) => {
-    const newSubscription = { ...subscription, id: Date.now().toString() };
-    setSubscriptions([...subscriptions, newSubscription]);
-  };
-
-  const updateSubscription = (subscription: Subscription) => {
-    setSubscriptions(
-      subscriptions.map((s) => (s.id === subscription.id ? subscription : s))
-    );
-  };
-
-  const deleteSubscription = (id: string) => {
-    setSubscriptions(subscriptions.filter((s) => s.id !== id));
+  const updateSubscription = async (subscription: Subscription) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(
+          `📝 AppContext: Updating subscription in MongoDB: ${subscription._id}`
+        );
+        const updatedSubscription = await apiRequest(
+          `/api/subscriptions/${subscription._id}`,
+          "PUT",
+          subscription
+        );
+        setSubscriptions(
+          subscriptions.map((s) =>
+            s._id === subscription._id ? updatedSubscription : s
+          )
+        );
+      } else {
+        setSubscriptions(
+          subscriptions.map((s) =>
+            s._id === subscription._id ? subscription : s
+          )
+        );
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating subscription:", error);
+    }
   };
 
   const getActiveSubscriptions = () => {
-    return subscriptions.filter((sub) => sub.isActive);
+    return subscriptions.filter((sub) => sub.active);
   };
 
   // Savings goal methods
-  const addSavingsGoal = (goal: Omit<SavingsGoal, "id">) => {
-    const newGoal = { ...goal, id: Date.now().toString() };
-    setSavingsGoals([...savingsGoals, newGoal]);
+  const addSavingsGoal = async (goal: Omit<SavingsGoal, "id">) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log("📝 AppContext: Adding savings goal to MongoDB");
+        const newGoal = await apiRequest("/api/savings-goals", "POST", goal);
+        setSavingsGoals([...savingsGoals, newGoal]);
+      } else {
+        const newGoal = { ...goal, id: Date.now().toString() };
+        setSavingsGoals([...savingsGoals, newGoal]);
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error adding savings goal:", error);
+    }
   };
 
-  const updateSavingsGoal = (goal: SavingsGoal) => {
-    setSavingsGoals(savingsGoals.map((g) => (g.id === goal.id ? goal : g)));
+  const updateSavingsGoal = async (goal: SavingsGoal) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(
+          `📝 AppContext: Updating savings goal in MongoDB: ${goal.id}`
+        );
+        const updatedGoal = await apiRequest(
+          `/api/savings-goals/${goal.id}`,
+          "PUT",
+          goal
+        );
+        setSavingsGoals(
+          savingsGoals.map((g) => (g.id === goal.id ? updatedGoal : g))
+        );
+      } else {
+        setSavingsGoals(savingsGoals.map((g) => (g.id === goal.id ? goal : g)));
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating savings goal:", error);
+    }
   };
 
-  const deleteSavingsGoal = (id: string) => {
-    // Remove the goal
-    setSavingsGoals(savingsGoals.filter((g) => g.id !== id));
+  const deleteSavingsGoal = async (id: string) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Deleting savings goal from MongoDB: ${id}`);
+        await apiRequest(`/api/savings-goals/${id}`, "DELETE");
+      }
 
-    // Unlink any assets associated with this goal
-    setAssets(
-      assets.map((asset) =>
-        asset.savingsGoalId === id ? { ...asset, savingsGoalId: null } : asset
-      )
-    );
+      // Remove the goal
+      setSavingsGoals(savingsGoals.filter((g) => g.id !== id));
+
+      // Unlink any assets associated with this goal
+      setAssets(
+        assets.map((asset) =>
+          asset.savingsGoalId === id ? { ...asset, savingsGoalId: null } : asset
+        )
+      );
+    } catch (error) {
+      console.error("❌ AppContext: Error deleting savings goal:", error);
+    }
   };
 
   // Calculate the current amount saved towards a savings goal
@@ -535,7 +546,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // Summary methods
-  const getFinancialSummary = (customPeriod?: Period): FinancialSummary => {
+  const getFinancialSummary = (
+    customPeriod?: Record<string, string>
+  ): FinancialSummary => {
     // Calculate billing period dates (25th to 25th)
     let startStr: string;
     let endStr: string;
@@ -563,19 +576,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     // Calculate regular income for the period
-    const totalIncome = incomes.reduce((sum, income) => {
-      // Use netAmount if available, otherwise fall back to amount for backward compatibility
-      const incomeAmount =
-        income.netAmount !== undefined ? income.netAmount : income.amount;
+    const totalIncome = incomes?.reduce((sum, income) => {
+      const incomeAmount = income.netAmount;
 
-      if (income.frequency === "annual") {
+      if (income.frequency === Frequency.YEARLY) {
         return sum + incomeAmount;
       }
       return sum + incomeAmount;
     }, 0);
 
     // Calculate expenses for the period
-    const totalExpenses = expenses.reduce((sum, expense) => {
+    const totalExpenses = expenses?.reduce((sum, expense) => {
       // Skip expenses outside the billing period
       if (expense.date && (expense.date < startStr || expense.date > endStr)) {
         return sum;
@@ -588,7 +599,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // For recurring expenses, calculate monthly equivalent
       const amount =
-        expense.frequency === "annual" ? expense.amount : expense.amount;
+        expense.frequency === Frequency.YEARLY
+          ? expense.amount
+          : expense.amount;
       return sum + amount;
     }, 0);
 
@@ -596,7 +609,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const totalSubscriptions = getActiveSubscriptions().reduce(
       (sum, subscription) => {
         const amount =
-          subscription.frequency === "annual"
+          subscription.frequency === Frequency.YEARLY
             ? subscription.amount / 12
             : subscription.amount;
         return sum + amount;
@@ -610,12 +623,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const netIncome = totalIncome - combinedExpenses;
     const savingsRate = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0;
 
-    const totalAssets = assets.reduce((sum, asset) => sum + asset.value, 0);
-    const totalLiabilities = liabilities.reduce(
-      (sum, liability) => sum + liability.amount,
-      0
-    );
-    const netWorth = totalAssets - totalLiabilities;
+    const totalAssets = 0;
+    const netWorth = totalAssets;
 
     return {
       totalIncome,
@@ -623,7 +632,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       netIncome,
       savingsRate,
       totalAssets,
-      totalLiabilities,
       netWorth,
       periodStartDate: startStr,
       periodEndDate: endStr,
@@ -760,65 +768,192 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // Budget methods
-  const setBudgetItems = (items: BudgetItem[]) => {
-    setBudgetItemsState(items);
+  const setBudgetItems = async (items: BudgetItem[]) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log("📝 AppContext: Setting budget items in MongoDB");
+        const updatedItems = await apiRequest("/api/budget-items", "PUT", {
+          items,
+        });
+        setBudgetItemsState(updatedItems);
+      } else {
+        setBudgetItemsState(items);
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error setting budget items:", error);
+    }
   };
 
   const getBudgetItems = () => {
     return budgetItems;
   };
 
-  const updateBudgetItem = (item: BudgetItem) => {
-    setBudgetItemsState((prevItems) =>
-      prevItems.map((prevItem) => (prevItem.id === item.id ? item : prevItem))
-    );
+  const updateBudgetItem = async (item: BudgetItem) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(
+          `📝 AppContext: Updating budget item in MongoDB: ${item.id}`
+        );
+        const updatedItem = await apiRequest(
+          `/api/budget-items/${item.id}`,
+          "PUT",
+          item
+        );
+        setBudgetItemsState((prevItems) =>
+          prevItems.map((prevItem) =>
+            prevItem.id === item.id ? updatedItem : prevItem
+          )
+        );
+      } else {
+        setBudgetItemsState((prevItems) =>
+          prevItems.map((prevItem) =>
+            prevItem.id === item.id ? item : prevItem
+          )
+        );
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating budget item:", error);
+    }
   };
 
   // Note methods
-  const addNote = (note: Omit<Note, "id" | "createdAt" | "updatedAt">) => {
-    const now = new Date().toISOString();
-    const newNote: Note = {
-      ...note,
-      id: Date.now().toString(),
-      createdAt: now,
-      updatedAt: now,
-    };
-    setNotes([newNote, ...notes]);
+  const addNote = async (
+    note: Omit<Note, "id" | "createdAt" | "updatedAt">
+  ) => {
+    try {
+      const now = new Date().toISOString();
+
+      if (useMongoDBData && isAuthenticated) {
+        console.log("📝 AppContext: Adding note to MongoDB");
+        const newNote = await apiRequest("/api/notes", "POST", {
+          ...note,
+          createdAt: now,
+          updatedAt: now,
+        });
+        setNotes([newNote, ...notes]);
+      } else {
+        const newNote: Note = {
+          ...note,
+          id: Date.now().toString(),
+          createdAt: now,
+          updatedAt: now,
+        };
+        setNotes([newNote, ...notes]);
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error adding note:", error);
+    }
   };
 
-  const updateNote = (note: Note) => {
-    const now = new Date().toISOString();
-    setNotes(
-      notes.map((n) => (n.id === note.id ? { ...note, updatedAt: now } : n))
-    );
+  const updateNote = async (note: Note) => {
+    try {
+      const now = new Date().toISOString();
+
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Updating note in MongoDB: ${note.id}`);
+        const updatedNote = await apiRequest(`/api/notes/${note.id}`, "PUT", {
+          ...note,
+          updatedAt: now,
+        });
+        setNotes(notes.map((n) => (n.id === note.id ? updatedNote : n)));
+      } else {
+        setNotes(
+          notes.map((n) => (n.id === note.id ? { ...note, updatedAt: now } : n))
+        );
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating note:", error);
+    }
   };
 
-  const deleteNote = (id: string) => {
-    setNotes(notes.filter((n) => n.id !== id));
+  const deleteNote = async (id: string) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Deleting note from MongoDB: ${id}`);
+        await apiRequest(`/api/notes/${id}`, "DELETE");
+      }
+      setNotes(notes.filter((n) => n.id !== id));
+    } catch (error) {
+      console.error("❌ AppContext: Error deleting note:", error);
+    }
   };
 
-  const toggleNotePin = (id: string) => {
-    setNotes(
-      notes.map((note) =>
-        note.id === id ? { ...note, isPinned: !note.isPinned } : note
-      )
-    );
+  const toggleNotePin = async (id: string) => {
+    try {
+      const noteToToggle = notes.find((note) => note.id === id);
+      if (!noteToToggle) return;
+
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Toggling note pin in MongoDB: ${id}`);
+        await apiRequest(`/api/notes/${id}/toggle-pin`, "PUT");
+      }
+
+      setNotes(
+        notes.map((note) =>
+          note.id === id ? { ...note, isPinned: !note.isPinned } : note
+        )
+      );
+    } catch (error) {
+      console.error("❌ AppContext: Error toggling note pin:", error);
+    }
   };
 
   // Tax return methods
-  const addTaxReturn = (taxReturn: Omit<TaxReturn, "id">) => {
-    const newTaxReturn = { ...taxReturn, id: Date.now().toString() };
-    setTaxReturns([...taxReturns, newTaxReturn]);
+  const addTaxReturn = async (taxReturn: Omit<TaxReturn, "id">) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log("📝 AppContext: Adding tax return to MongoDB");
+        const newTaxReturn = await apiRequest(
+          "/api/tax-returns",
+          "POST",
+          taxReturn
+        );
+        setTaxReturns([...taxReturns, newTaxReturn]);
+      } else {
+        const newTaxReturn = { ...taxReturn, id: Date.now().toString() };
+        setTaxReturns([...taxReturns, newTaxReturn]);
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error adding tax return:", error);
+    }
   };
 
-  const updateTaxReturn = (taxReturn: TaxReturn) => {
-    setTaxReturns(
-      taxReturns.map((tr) => (tr.id === taxReturn.id ? taxReturn : tr))
-    );
+  const updateTaxReturn = async (taxReturn: TaxReturn) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(
+          `📝 AppContext: Updating tax return in MongoDB: ${taxReturn.id}`
+        );
+        const updatedTaxReturn = await apiRequest(
+          `/api/tax-returns/${taxReturn.id}`,
+          "PUT",
+          taxReturn
+        );
+        setTaxReturns(
+          taxReturns.map((tr) =>
+            tr.id === taxReturn.id ? updatedTaxReturn : tr
+          )
+        );
+      } else {
+        setTaxReturns(
+          taxReturns.map((tr) => (tr.id === taxReturn.id ? taxReturn : tr))
+        );
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating tax return:", error);
+    }
   };
 
-  const deleteTaxReturn = (id: string) => {
-    setTaxReturns(taxReturns.filter((tr) => tr.id !== id));
+  const deleteTaxReturn = async (id: string) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Deleting tax return from MongoDB: ${id}`);
+        await apiRequest(`/api/tax-returns/${id}`, "DELETE");
+      }
+      setTaxReturns(taxReturns.filter((tr) => tr.id !== id));
+    } catch (error) {
+      console.error("❌ AppContext: Error deleting tax return:", error);
+    }
   };
 
   // Mark setup as complete
@@ -933,7 +1068,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         assets,
         liabilities,
         savingsGoals,
-        subscriptions,
         budgetItems,
         notes,
         taxReturns,
@@ -958,12 +1092,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         addLiability,
         updateLiability,
         deleteLiability,
-
-        // Subscription methods
-        addSubscription,
-        updateSubscription,
-        deleteSubscription,
-        getActiveSubscriptions,
 
         // Savings goal methods
         addSavingsGoal,

@@ -39,7 +39,6 @@ const protect = asyncHandler(
         // Get user from the token (excluding password)
         const user = await User.findById(decoded.id).select("-password");
         if (user) {
-          // @ts-ignore - Assigning Mongoose document to IUser interface
           req.user = user;
         }
 

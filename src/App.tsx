@@ -180,15 +180,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-const PlaceholderPage: React.FC<{ name: string }> = ({ name }) => {
-  return (
-    <div className="text-center py-20">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">{name} Page</h2>
-      <p className="text-gray-600">This page is under development.</p>
-    </div>
-  );
-};
-
 // Main App Router
 const AppRouter: React.FC = () => {
   const { isLoading: appLoading } = useAppContext();
@@ -302,7 +293,7 @@ const AppRouter: React.FC = () => {
           path="/future-tracker"
           element={
             <Layout>
-              <FutureTrackerPage />
+              <SettingsPage />
             </Layout>
           }
         />
@@ -311,7 +302,7 @@ const AppRouter: React.FC = () => {
           path="/budget"
           element={
             <Layout>
-              <Budget />
+              <SettingsPage />
             </Layout>
           }
         />
@@ -320,7 +311,7 @@ const AppRouter: React.FC = () => {
           path="/notes"
           element={
             <Layout>
-              <Notes />
+              <SettingsPage />
             </Layout>
           }
         />
@@ -329,7 +320,7 @@ const AppRouter: React.FC = () => {
           path="/tax-returns"
           element={
             <Layout>
-              <TaxReturnPage />
+              <SettingsPage />
             </Layout>
           }
         />
@@ -338,7 +329,7 @@ const AppRouter: React.FC = () => {
           path="/liabilities"
           element={
             <Layout>
-              <LiabilitiesPage />
+              <SettingsPage />
             </Layout>
           }
         />
@@ -347,7 +338,7 @@ const AppRouter: React.FC = () => {
           path="/net-worth"
           element={
             <Layout>
-              <NetWorthPage />
+              <SettingsPage />
             </Layout>
           }
         />
@@ -356,7 +347,7 @@ const AppRouter: React.FC = () => {
           path="/what-if"
           element={
             <Layout>
-              <WhatIfCalculatorPage />
+              <SettingsPage />
             </Layout>
           }
         />

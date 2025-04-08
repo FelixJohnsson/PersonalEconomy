@@ -5,6 +5,7 @@ export interface ILiability extends mongoose.Document {
   user: IUser["_id"];
   name: string;
   amount: number;
+  type: string;
   interestRate?: number;
   minimumPayment?: number;
   dueDate?: string;
@@ -12,6 +13,16 @@ export interface ILiability extends mongoose.Document {
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface LiabilityType {
+  name: string;
+  amount: number;
+  type: string;
+  interestRate?: number;
+  minimumPayment?: number;
+  dueDate?: string;
+  category?: string;
 }
 
 const liabilitySchema = new mongoose.Schema<ILiability>(
@@ -28,6 +39,10 @@ const liabilitySchema = new mongoose.Schema<ILiability>(
     amount: {
       type: Number,
       required: [true, "Please add an amount"],
+    },
+    type: {
+      type: String,
+      required: true,
     },
     interestRate: {
       type: Number,

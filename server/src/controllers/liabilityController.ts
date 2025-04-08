@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import Liability, { ILiability } from "../models/liabilityModel";
+import Liability from "../models/liabilityModel";
 import { IUser } from "../models/userModel";
 
 // Extend Express Request interface to include user property

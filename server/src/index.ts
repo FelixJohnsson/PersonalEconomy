@@ -7,10 +7,8 @@ import connectDB from "./config/db";
 
 // Import routes
 import userRoutes from "./routes/userRoutes";
-import importRoutes from "./routes/importRoutes";
 import testRoutes from "./routes/testRoutes";
 import userDataRoutes from "./routes/userDataRoutes";
-
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -38,7 +36,6 @@ if (process.env.NODE_ENV === "development") {
 // API Routes
 app.use("/api/users", userRoutes);
 app.use("/api/user-data", userDataRoutes);
-app.use("/api/import", importRoutes);
 app.use("/api/test", testRoutes);
 
 // Basic route for testing

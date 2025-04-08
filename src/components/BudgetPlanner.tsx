@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useAppContext } from "../context/AppContext";
-import { EXPENSE_CATEGORIES, BudgetItem } from "../types";
+import { EXPENSE_CATEGORIES, BudgetItem, Frequency } from "../types";
 import { formatCurrency } from "../utils/formatters";
 import { v4 as uuidv4 } from "uuid";
+import { useSubscriptions } from "../hooks/useSubscriptions";
 
 const BudgetPlanner: React.FC = () => {
   const {
@@ -10,8 +11,9 @@ const BudgetPlanner: React.FC = () => {
     incomes,
     budgetItems: savedBudgetItems,
     setBudgetItems,
-    getActiveSubscriptions,
   } = useAppContext();
+
+  const { sortedSubscriptions } = useSubscriptions();
 
   const [grossMonthlyIncome, setGrossMonthlyIncome] = useState<number>(0);
   const [monthlySubscriptionCosts, setMonthlySubscriptionCosts] =
@@ -29,10 +31,10 @@ const BudgetPlanner: React.FC = () => {
   useEffect(() => {
     // Calculate total monthly income
     const totalMonthlyIncome = incomes.reduce((total, income) => {
-      if (income.frequency === "monthly") {
-        return total + income.amount;
-      } else if (income.frequency === "annual") {
-        return total + income.amount / 12;
+      if (income.frequency === Frequency.MONTHLY) {
+        return total + income.netAmount;
+      } else if (income.frequency === Frequency.YEARLY) {
+        return total + income.netAmount / 12;
       }
       return total;
     }, 0);
@@ -40,12 +42,11 @@ const BudgetPlanner: React.FC = () => {
     setGrossMonthlyIncome(totalMonthlyIncome);
 
     // Calculate monthly subscription costs
-    const activeSubscriptions = getActiveSubscriptions();
-    const subscriptionTotal = activeSubscriptions.reduce(
+    const subscriptionTotal = sortedSubscriptions.reduce(
       (total, subscription) => {
-        if (subscription.frequency === "monthly") {
+        if (subscription.frequency === Frequency.MONTHLY) {
           return total + subscription.amount;
-        } else if (subscription.frequency === "annual") {
+        } else if (subscription.frequency === Frequency.YEARLY) {
           return total + subscription.amount / 12;
         }
         return total;
@@ -58,7 +59,7 @@ const BudgetPlanner: React.FC = () => {
     // Set income as total income minus subscription costs
     const incomeAfterSubscriptions = totalMonthlyIncome - subscriptionTotal;
     setMonthlyIncome(incomeAfterSubscriptions);
-  }, [incomes, getActiveSubscriptions]);
+  }, [incomes]);
 
   // Initialize budget items - either from saved data or with default categories
   useEffect(() => {

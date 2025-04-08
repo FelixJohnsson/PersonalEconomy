@@ -1,93 +1,20 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { subscriptionSchema, ISubscription } from "./subscriptionModel";
+import Income, { IIncome } from "./incomeModel";
+import Expense, { IExpense } from "./expenseModel";
+import Asset, { IAsset } from "./assetModel";
+import Liability, { ILiability } from "./liabilityModel";
 
-export enum IncomeFrequency {
+export enum Frequency {
   MONTHLY = "monthly",
   WEEKLY = "weekly",
   BIWEEKLY = "biweekly",
   DAILY = "daily",
+  QUARTERLY = "quarterly",
+  YEARLY = "yearly",
 }
-
-// Income interface
-export interface IncomeFromClient {
-  name: string;
-  grossAmount: number;
-  netAmount: number;
-  taxRate: number;
-  frequency: IncomeFrequency;
-  isRecurring: boolean;
-  type: string;
-  date: string;
-}
-
-export interface Income extends IncomeFromClient {
-  _id: mongoose.Types.ObjectId;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Expense interface
-export interface Expense {
-  _id?: mongoose.Types.ObjectId;
-  name: string;
-  amount: number;
-  category: string;
-  isRecurring: boolean;
-  date: string;
-  necessityLevel?: string;
-  frequency?: string;
-  notes?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-// Asset Value interface
-export interface AssetValue {
-  _id?: mongoose.Types.ObjectId;
-  date: string;
-  value: number;
-}
-
-// Asset Deposit interface
-export interface AssetDeposit {
-  _id?: mongoose.Types.ObjectId;
-  date: string;
-  amount: number;
-  notes?: string;
-}
-
-// Asset interface
-export interface Asset {
-  _id?: mongoose.Types.ObjectId;
-  name: string;
-  type: string;
-  value: number;
-  initialValue: number;
-  purchaseDate: string;
-  category: string;
-  notes?: string;
-  values?: AssetValue[];
-  deposits?: AssetDeposit[];
-  savingsGoalId?: string | null;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-// Liability interface
-export interface Liability {
-  _id?: mongoose.Types.ObjectId;
-  name: string;
-  type: string;
-  amount: number;
-  interestRate: number;
-  minimumPayment: number;
-  dueDate: string;
-  notes?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
 export interface IUser extends mongoose.Document {
   _id: mongoose.Types.ObjectId;
   name: string;
@@ -95,186 +22,22 @@ export interface IUser extends mongoose.Document {
   password: string;
   isSetupComplete: boolean;
   // Add embedded data arrays
-  incomes: Income[];
-  expenses: Expense[];
-  assets: Asset[];
-  liabilities: Liability[];
+  incomes: IIncome[];
+  expenses: IExpense[];
+  assets: IAsset[];
+  liabilities: ILiability[];
+  subscriptions: ISubscription[];
   createdAt: Date;
   updatedAt: Date;
   matchPassword(enteredPassword: string): Promise<boolean>;
   getSignedJwtToken(): string;
 }
 
-// Income schema
-const incomeSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-    },
-    amount: {
-      type: Number,
-      required: true,
-    },
-    frequency: {
-      type: String,
-      required: true,
-    },
-    date: {
-      type: String,
-      required: true,
-    },
-    category: {
-      type: String,
-      required: true,
-    },
-    notes: {
-      type: String,
-    },
-    isRecurring: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  { _id: true, timestamps: true }
-);
-
-// Expense schema
-const expenseSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-    },
-    amount: {
-      type: Number,
-      required: true,
-    },
-    category: {
-      type: String,
-      required: true,
-    },
-    isRecurring: {
-      type: Boolean,
-      default: false,
-    },
-    date: {
-      type: String,
-      required: true,
-    },
-    necessityLevel: {
-      type: String,
-    },
-    frequency: {
-      type: String,
-    },
-    notes: {
-      type: String,
-    },
-  },
-  { _id: true, timestamps: true }
-);
-
-// Asset value schema
-const assetValueSchema = new mongoose.Schema({
-  date: {
-    type: String,
-    required: true,
-  },
-  value: {
-    type: Number,
-    required: true,
-  },
-});
-
-// Asset deposit schema
-const assetDepositSchema = new mongoose.Schema({
-  date: {
-    type: String,
-    required: true,
-  },
-  amount: {
-    type: Number,
-    required: true,
-  },
-  notes: {
-    type: String,
-  },
-});
-
-// Asset schema
-const assetSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-    },
-    type: {
-      type: String,
-      required: true,
-    },
-    value: {
-      type: Number,
-      required: true,
-    },
-    initialValue: {
-      type: Number,
-      required: true,
-    },
-    purchaseDate: {
-      type: String,
-      required: true,
-    },
-    category: {
-      type: String,
-      required: true,
-    },
-    notes: {
-      type: String,
-    },
-    values: [assetValueSchema],
-    deposits: [assetDepositSchema],
-    savingsGoalId: {
-      type: String,
-      default: null,
-    },
-  },
-  { _id: true, timestamps: true }
-);
-
-// Liability schema
-const liabilitySchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-    },
-    type: {
-      type: String,
-      required: true,
-    },
-    amount: {
-      type: Number,
-      required: true,
-    },
-    interestRate: {
-      type: Number,
-      required: true,
-    },
-    minimumPayment: {
-      type: Number,
-      required: true,
-    },
-    dueDate: {
-      type: String,
-      required: true,
-    },
-    notes: {
-      type: String,
-    },
-  },
-  { _id: true, timestamps: true }
-);
+// Create schemas from models to embed in user
+const incomeSchema = (Income as any).schema;
+const expenseSchema = (Expense as any).schema;
+const assetSchema = (Asset as any).schema;
+const liabilitySchema = (Liability as any).schema;
 
 const userSchema = new mongoose.Schema<IUser>(
   {
@@ -287,6 +50,7 @@ const userSchema = new mongoose.Schema<IUser>(
       required: [true, "Please add an email"],
       unique: true,
       match: [
+        // eslint-disable-next-line no-useless-escape
         /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
         "Please add a valid email",
       ],
@@ -306,6 +70,7 @@ const userSchema = new mongoose.Schema<IUser>(
     expenses: [expenseSchema],
     assets: [assetSchema],
     liabilities: [liabilitySchema],
+    subscriptions: [subscriptionSchema],
   },
   {
     timestamps: true,

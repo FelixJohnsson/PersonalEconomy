@@ -1,17 +1,29 @@
 import mongoose from "mongoose";
-import { IUser } from "./userModel";
+import { Frequency, IUser } from "./userModel";
 
 export interface IIncome extends mongoose.Document {
   user: IUser["_id"];
   name: string;
-  amount: number;
-  grossAmount?: number;
-  netAmount?: number;
-  taxRate?: number;
-  frequency: "monthly" | "annual";
-  category: string;
+  grossAmount: number;
+  netAmount: number;
+  taxRate: number;
+  frequency: Frequency;
+  type: string;
+  date: string;
+  isRecurring: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface IncomeType {
+  date: string;
+  frequency: Frequency;
+  grossAmount: number;
+  isRecurring: boolean;
+  name: string;
+  netAmount: number;
+  taxRate: number;
+  type: string;
 }
 
 const incomeSchema = new mongoose.Schema<IIncome>(
@@ -25,10 +37,6 @@ const incomeSchema = new mongoose.Schema<IIncome>(
       type: String,
       required: [true, "Please add a name"],
     },
-    amount: {
-      type: Number,
-      required: [true, "Please add an amount"],
-    },
     grossAmount: {
       type: Number,
     },
@@ -41,11 +49,19 @@ const incomeSchema = new mongoose.Schema<IIncome>(
     frequency: {
       type: String,
       required: true,
-      enum: ["monthly", "annual"],
+      enum: ["monthly", "annual", "weekly", "biweekly", "daily", "quarterly"],
     },
-    category: {
+    type: {
       type: String,
       required: true,
+    },
+    date: {
+      type: String,
+      required: true,
+    },
+    isRecurring: {
+      type: Boolean,
+      default: false,
     },
   },
   {

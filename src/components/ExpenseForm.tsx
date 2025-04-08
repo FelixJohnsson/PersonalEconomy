@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from "react";
-import { useAppContext } from "../context/AppContext";
-import { Expense, NecessityLevel, EXPENSE_CATEGORIES } from "../types";
+import {
+  NecessityLevel,
+  EXPENSE_CATEGORIES,
+  Frequency,
+  Expense,
+  ExpenseFormData,
+} from "../types";
 
 interface ExpenseFormProps {
   initialExpense?: Expense;
   onSubmit: () => void;
+  addExpense: (expense: ExpenseFormData) => void;
+  updateExpense: (expense: Expense) => void;
+  deselectExpense: () => void;
 }
 
 const ExpenseForm: React.FC<ExpenseFormProps> = ({
   initialExpense,
   onSubmit,
+  addExpense,
+  updateExpense,
+  deselectExpense,
 }) => {
-  const { addExpense, updateExpense } = useAppContext();
-
   const [name, setName] = useState(initialExpense?.name || "");
   const [amount, setAmount] = useState(initialExpense?.amount.toString() || "");
   const [category, setCategory] = useState(initialExpense?.category || "");
@@ -22,8 +31,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       ? !EXPENSE_CATEGORIES.includes(initialExpense.category as any)
       : false
   );
-  const [frequency, setFrequency] = useState<"monthly" | "annual">(
-    initialExpense?.frequency || "monthly"
+  const [frequency, setFrequency] = useState<Frequency>(
+    initialExpense?.frequency || Frequency.MONTHLY
   );
   const [isRecurring, setIsRecurring] = useState(
     initialExpense?.isRecurring || false
@@ -31,7 +40,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   const [date, setDate] = useState(
     initialExpense?.date || new Date().toISOString().split("T")[0]
   );
-  const [notes, setNotes] = useState(initialExpense?.notes || "");
+  const [notes, setNotes] = useState("");
   const [necessityLevel, setNecessityLevel] = useState<
     NecessityLevel | undefined
   >(initialExpense?.necessityLevel || undefined);
@@ -51,10 +60,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           ? initialExpense.category
           : ""
       );
-      setFrequency(initialExpense.frequency || "monthly");
+      setFrequency(initialExpense.frequency || Frequency.MONTHLY);
       setIsRecurring(initialExpense.isRecurring);
       setDate(initialExpense.date || new Date().toISOString().split("T")[0]);
-      setNotes(initialExpense.notes || "");
+      setNotes("");
       setNecessityLevel(initialExpense.necessityLevel);
       setError("");
     }
@@ -80,13 +89,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       return;
     }
 
-    const expenseData: Omit<Expense, "id"> = {
+    const expenseData: ExpenseFormData = {
       name,
       amount: numAmount,
       category: finalCategory,
       isRecurring,
       date,
-      notes: notes.trim() || undefined,
       necessityLevel,
     };
 
@@ -96,7 +104,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     }
 
     if (initialExpense) {
-      updateExpense({ ...expenseData, id: initialExpense.id });
+      updateExpense({
+        ...expenseData,
+        _id: initialExpense._id,
+        updatedAt: initialExpense.updatedAt,
+        createdAt: initialExpense.createdAt,
+      });
     } else {
       addExpense(expenseData);
     }
@@ -107,7 +120,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     setCategory("");
     setCustomCategory("");
     setShowCustomCategory(false);
-    setFrequency("monthly");
+    setFrequency(Frequency.MONTHLY);
     setIsRecurring(false);
     setDate(new Date().toISOString().split("T")[0]);
     setNotes("");
@@ -302,12 +315,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
             id="frequency"
             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             value={frequency}
-            onChange={(e) =>
-              setFrequency(e.target.value as "monthly" | "annual")
-            }
+            onChange={(e) => setFrequency(e.target.value as Frequency)}
           >
-            <option value="monthly">Monthly</option>
-            <option value="annual">Annual</option>
+            <option value={Frequency.MONTHLY}>Monthly</option>
+            <option value={Frequency.YEARLY}>Annual</option>
           </select>
         </div>
       )}
@@ -352,6 +363,15 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         >
           {initialExpense ? "Update" : "Add"} Expense
         </button>
+        {initialExpense && (
+          <button
+            type="button"
+            onClick={deselectExpense}
+            className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+          >
+            Cancel
+          </button>
+        )}
       </div>
     </form>
   );

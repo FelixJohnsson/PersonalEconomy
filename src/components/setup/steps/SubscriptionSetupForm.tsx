@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useAppContext } from "../../../context/AppContext";
+import { Frequency } from "../../../types";
 
 interface SubscriptionSetupFormProps {
   onNext: () => void;
@@ -53,7 +54,7 @@ const SubscriptionSetupForm: React.FC<SubscriptionSetupFormProps> = ({
           name: sub.name,
           amount: sub.amount.toString(),
           category: sub.category,
-          billingCycle: sub.billingCycle || "monthly",
+          billingCycle: sub.billingDate || Frequency.MONTHLY,
           renewalDate:
             sub.renewalDate || new Date().toISOString().split("T")[0],
           autoRenews: sub.autoRenews || true,
@@ -134,12 +135,16 @@ const SubscriptionSetupForm: React.FC<SubscriptionSetupFormProps> = ({
           category: item.category,
           // Convert quarterly to monthly for backend compatibility
           billingCycle:
-            item.billingCycle === "quarterly" ? "monthly" : item.billingCycle,
+            item.billingCycle === Frequency.QUARTERLY
+              ? Frequency.MONTHLY
+              : item.billingCycle,
           renewalDate: item.renewalDate,
           autoRenews: item.autoRenews,
           // Convert quarterly to monthly for backend compatibility
           frequency:
-            item.billingCycle === "quarterly" ? "monthly" : item.billingCycle,
+            item.billingCycle === Frequency.QUARTERLY
+              ? Frequency.MONTHLY
+              : item.billingCycle,
           billingDate: item.renewalDate,
           isActive: true,
         });

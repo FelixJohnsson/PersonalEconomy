@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAppContext } from "../../../context/AppContext";
-import { EXPENSE_CATEGORIES, ExpenseCategory } from "../../../types";
+import { EXPENSE_CATEGORIES, ExpenseCategory, Frequency } from "../../../types";
 
 interface BudgetSetupFormProps {
   onNext: () => void;
@@ -29,10 +29,10 @@ const BudgetSetupForm: React.FC<BudgetSetupFormProps> = ({
   // Calculate total monthly income
   useEffect(() => {
     const monthlyTotal = incomes.reduce((total, income) => {
-      if (income.frequency === "monthly") {
-        return total + income.amount;
-      } else if (income.frequency === "annual") {
-        return total + income.amount / 12;
+      if (income.frequency === Frequency.MONTHLY) {
+        return total + income.netAmount;
+      } else if (income.frequency === Frequency.YEARLY) {
+        return total + income.netAmount / 12;
       }
       return total;
     }, 0);

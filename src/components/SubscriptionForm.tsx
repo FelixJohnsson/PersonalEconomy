@@ -1,35 +1,43 @@
 import React, { useState, useEffect } from "react";
-import { useAppContext } from "../context/AppContext";
-import { Subscription, NecessityLevel } from "../types";
+import {
+  Subscription,
+  NecessityLevel,
+  EXPENSE_CATEGORIES,
+  Frequency,
+} from "../types";
 
 interface SubscriptionFormProps {
   initialSubscription?: Subscription;
   onSubmit?: () => void;
+  addSubscription: (subscription: Subscription) => void;
+  updateSubscription: (subscription: Subscription) => void;
+  deselectSubscription: () => void;
 }
 
 const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
   initialSubscription,
   onSubmit,
+  addSubscription,
+  updateSubscription,
+  deselectSubscription,
 }) => {
-  const { addSubscription, updateSubscription } = useAppContext();
-
   const [name, setName] = useState(initialSubscription?.name || "");
   const [amount, setAmount] = useState(initialSubscription?.amount || 0);
-  const [frequency, setFrequency] = useState<"monthly" | "annual">(
-    initialSubscription?.frequency || "monthly"
+  const [frequency, setFrequency] = useState<Frequency>(
+    initialSubscription?.frequency || Frequency.MONTHLY
   );
   const [billingDate, setBillingDate] = useState(
     initialSubscription?.billingDate || new Date().toISOString().split("T")[0]
   );
-  const [notes, setNotes] = useState(initialSubscription?.notes || "");
   const [isActive, setIsActive] = useState(
-    initialSubscription?.isActive !== undefined
-      ? initialSubscription.isActive
+    initialSubscription?.active !== undefined
+      ? initialSubscription.active
       : true
   );
-  const [necessityLevel, setNecessityLevel] = useState<
-    NecessityLevel | undefined
-  >(initialSubscription?.necessityLevel || undefined);
+  const [necessityLevel, setNecessityLevel] = useState<NecessityLevel>(
+    initialSubscription?.necessityLevel || "C"
+  );
+  const [category, setCategory] = useState(initialSubscription?.category || "");
   const [error, setError] = useState("");
 
   // Update form state when initialSubscription changes (for editing)
@@ -39,9 +47,9 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
       setAmount(initialSubscription.amount);
       setFrequency(initialSubscription.frequency);
       setBillingDate(initialSubscription.billingDate);
-      setNotes(initialSubscription.notes || "");
-      setIsActive(initialSubscription.isActive);
+      setIsActive(initialSubscription.active);
       setNecessityLevel(initialSubscription.necessityLevel);
+      setCategory(initialSubscription.category || "");
       setError("");
     }
   }, [initialSubscription]);
@@ -59,68 +67,54 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
       return;
     }
 
-    const subscriptionData: Omit<Subscription, "id"> = {
+    if (!category) {
+      setError("Please select a category");
+      return;
+    }
+
+    const updatedSubscription: Subscription = {
+      _id: initialSubscription?._id || "",
+      updatedAt: initialSubscription?.updatedAt || "",
+      createdAt: initialSubscription?.createdAt || "",
       name,
       amount,
       frequency,
-      category: "Subscription", // Use a default category
+      category,
       billingDate,
-      notes,
-      isActive,
+      active: isActive,
       necessityLevel,
     };
 
     if (initialSubscription) {
-      updateSubscription({ ...subscriptionData, id: initialSubscription.id });
+      updateSubscription({ ...updatedSubscription });
     } else {
-      addSubscription(subscriptionData);
+      addSubscription(updatedSubscription);
     }
 
     // Reset form
     if (!initialSubscription) {
       setName("");
       setAmount(0);
-      setFrequency("monthly");
+      setFrequency(Frequency.MONTHLY);
       setBillingDate(new Date().toISOString().split("T")[0]);
-      setNotes("");
       setIsActive(true);
-      setNecessityLevel(undefined);
+      setNecessityLevel("C");
+      setCategory("");
     }
 
     setError("");
     if (onSubmit) onSubmit();
   };
 
-  const getNecessityLevelColor = (level?: NecessityLevel) => {
-    switch (level) {
-      case "A+":
-        return "bg-green-700 text-white";
-      case "A":
-        return "bg-green-500 text-white";
-      case "B":
-        return "bg-green-300";
-      case "C":
-        return "bg-yellow-300";
-      case "D":
-        return "bg-orange-300";
-      case "E":
-        return "bg-red-300";
-      case "F":
-        return "bg-red-500 text-white";
-      default:
-        return "bg-gray-200";
-    }
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="bg-white shadow-md rounded p-6">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           {error}
         </div>
       )}
 
-      <div className="mb-4">
+      <div>
         <label
           className="block text-gray-700 text-sm font-bold mb-2"
           htmlFor="name"
@@ -137,7 +131,7 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
         />
       </div>
 
-      <div className="mb-4">
+      <div>
         <label
           className="block text-gray-700 text-sm font-bold mb-2"
           htmlFor="amount"
@@ -156,7 +150,7 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
         />
       </div>
 
-      <div className="mb-4">
+      <div>
         <label
           className="block text-gray-700 text-sm font-bold mb-2"
           htmlFor="frequency"
@@ -167,14 +161,37 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
           id="frequency"
           className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
           value={frequency}
-          onChange={(e) => setFrequency(e.target.value as "monthly" | "annual")}
+          onChange={(e) => setFrequency(e.target.value as Frequency)}
         >
-          <option value="monthly">Monthly</option>
-          <option value="annual">Annual</option>
+          <option value={Frequency.MONTHLY}>Monthly</option>
+          <option value={Frequency.YEARLY}>Yearly</option>
         </select>
       </div>
 
-      <div className="mb-4">
+      <div>
+        <label
+          className="block text-gray-700 text-sm font-bold mb-2"
+          htmlFor="category"
+        >
+          Category
+        </label>
+        <select
+          id="category"
+          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          required
+        >
+          <option value="">-- Select Category --</option>
+          {EXPENSE_CATEGORIES.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
         <label
           className="block text-gray-700 text-sm font-bold mb-2"
           htmlFor="billingDate"
@@ -190,7 +207,7 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
         />
       </div>
 
-      <div className="mb-4">
+      <div>
         <label
           className="block text-gray-700 text-sm font-bold mb-2"
           htmlFor="necessityLevel"
@@ -199,17 +216,10 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
         </label>
         <select
           id="necessityLevel"
-          className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${
-            necessityLevel ? getNecessityLevelColor(necessityLevel) : ""
-          }`}
-          value={necessityLevel || ""}
-          onChange={(e) =>
-            setNecessityLevel(
-              e.target.value ? (e.target.value as NecessityLevel) : undefined
-            )
-          }
+          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+          value={necessityLevel}
+          onChange={(e) => setNecessityLevel(e.target.value as NecessityLevel)}
         >
-          <option value="">-- Select Necessity Level --</option>
           <option value="A+">A+ (Essential)</option>
           <option value="A">A (Very Important)</option>
           <option value="B">B (Important)</option>
@@ -220,24 +230,7 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
         </select>
       </div>
 
-      <div className="mb-4">
-        <label
-          className="block text-gray-700 text-sm font-bold mb-2"
-          htmlFor="notes"
-        >
-          Notes
-        </label>
-        <textarea
-          id="notes"
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          placeholder="Additional notes about this subscription"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-        />
-      </div>
-
-      <div className="mb-4">
+      <div>
         <label className="flex items-center">
           <input
             type="checkbox"
@@ -256,6 +249,24 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({
         >
           {initialSubscription ? "Update Subscription" : "Add Subscription"}
         </button>
+        {initialSubscription ? (
+          <button
+            type="button"
+            className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            onClick={() => {
+              setName("");
+              setAmount(0);
+              setFrequency(Frequency.MONTHLY);
+              setBillingDate(new Date().toISOString().split("T")[0]);
+              setIsActive(true);
+              setNecessityLevel("C");
+              setCategory("");
+              deselectSubscription();
+            }}
+          >
+            Cancel
+          </button>
+        ) : null}
       </div>
     </form>
   );

@@ -4,7 +4,6 @@ import { useAppContext } from "../context/AppContext";
 import MetricCard from "../components/metrics/MetricCard";
 import NetIncomeMetric from "../components/metrics/NetIncomeMetric";
 import { formatCurrency, formatPercentage } from "../utils/formatters";
-import { Period } from "../types";
 import DateRangeSelector from "../components/forms/DateRangeSelector";
 import InfoCard from "../components/ui/InfoCard";
 import NetWorthMiniChart from "../components/charts/NetWorthMiniChart";
@@ -18,24 +17,26 @@ const Dashboard: React.FC = () => {
     assets,
     liabilities,
   } = useAppContext();
-  const [customPeriod, setCustomPeriod] = useState<Period>(() => {
-    const today = new Date();
+  const [customPeriod, setCustomPeriod] = useState<Record<string, string>>(
+    () => {
+      const today = new Date();
 
-    // Start date is always 25th of previous month
-    const startDate = new Date(
-      today.getFullYear(),
-      today.getMonth() - 1,
-      25 + 1
-    );
+      // Start date is always 25th of previous month
+      const startDate = new Date(
+        today.getFullYear(),
+        today.getMonth() - 1,
+        25 + 1
+      );
 
-    // End date is always 25th of current month
-    const endDate = new Date(today.getFullYear(), today.getMonth(), 25 + 1);
+      // End date is always 25th of current month
+      const endDate = new Date(today.getFullYear(), today.getMonth(), 25 + 1);
 
-    return {
-      startDate: startDate.toISOString().split("T")[0],
-      endDate: endDate.toISOString().split("T")[0],
-    };
-  });
+      return {
+        startDate: startDate.toISOString().split("T")[0],
+        endDate: endDate.toISOString().split("T")[0],
+      };
+    }
+  );
 
   // Get net worth history data
   const [netWorthHistory, setNetWorthHistory] = useState<
@@ -68,7 +69,7 @@ const Dashboard: React.FC = () => {
     dateType: "startDate" | "endDate",
     value: string
   ) => {
-    setCustomPeriod((prev) => ({
+    setCustomPeriod((prev: Record<string, string>) => ({
       ...prev,
       [dateType]: value,
     }));
@@ -419,7 +420,7 @@ const Dashboard: React.FC = () => {
 
                         return (
                           <li
-                            key={sub.id}
+                            key={sub._id}
                             className="flex justify-between items-center text-sm"
                           >
                             <span>{sub.name}</span>

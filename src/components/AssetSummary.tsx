@@ -4,11 +4,12 @@ import { formatCurrency } from "../utils/formatters";
 
 const AssetSummary: React.FC = () => {
   const { assets, getFinancialSummary } = useAppContext();
+  if (!assets) return null;
 
   const { totalAssets } = getFinancialSummary();
 
   // Group assets by type
-  const assetsByType = assets.reduce((acc, asset) => {
+  const assetsByType = assets?.reduce((acc, asset) => {
     if (!acc[asset.type]) {
       acc[asset.type] = [];
     }
@@ -17,9 +18,9 @@ const AssetSummary: React.FC = () => {
   }, {} as Record<string, typeof assets>);
 
   // Calculate total by type
-  const totalsByType = Object.entries(assetsByType).map(([type, assets]) => ({
+  const totalsByType = Object.entries(assetsByType)?.map(([type, assets]) => ({
     type,
-    total: assets.reduce((sum, asset) => sum + asset.value, 0),
+    total: assets?.reduce((sum, asset) => sum + asset.value, 0),
   }));
 
   // Sort by total value (highest first)
@@ -92,7 +93,7 @@ const AssetSummary: React.FC = () => {
             <h4 className="text-md font-medium mb-1">{getTypeLabel(type)}</h4>
             <ul className="divide-y">
               {assets.map((asset) => (
-                <li key={asset.id} className="py-2">
+                <li key={asset._id} className="py-2">
                   <div className="flex justify-between">
                     <div>
                       <p className="text-sm font-medium">{asset.name}</p>

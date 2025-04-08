@@ -1,5 +1,6 @@
 import React from "react";
 import DataImportExport from "../components/settings/DataImportExport";
+import DatabaseTools from "../components/DatabaseTools";
 
 const SettingsPage: React.FC = () => {
   return (
@@ -13,7 +14,7 @@ const SettingsPage: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-8">
         <DataImportExport />
-
+        <DatabaseTools />
         {/* Additional settings sections can be added here in the future */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4">About</h2>

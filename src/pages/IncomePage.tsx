@@ -164,7 +164,7 @@ const IncomePage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            onClick={() => setSelectedIncome(income.id)}
+                            onClick={() => setSelectedIncome(income._id)}
                             className="text-blue-600 hover:text-blue-900 mr-4"
                           >
                             Edit
@@ -189,7 +189,7 @@ const IncomePage: React.FC = () => {
           <IncomeForm
             initialIncome={
               selectedIncome
-                ? incomes.find((i) => i.id === selectedIncome)
+                ? incomes.find((i) => i._id === selectedIncome)
                 : undefined
             }
             onSubmit={() => setSelectedIncome(null)}

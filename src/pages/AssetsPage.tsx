@@ -80,7 +80,8 @@ const AssetsPage: React.FC = () => {
 
   // Calculate value change percentage (excluding deposits)
   const getValueChange = (asset: Asset) => {
-    if (asset.historicalValues.length < 2) return null;
+    if (!asset.historicalValues || asset.historicalValues.length < 2)
+      return null;
     const lastValue =
       asset.historicalValues[asset.historicalValues.length - 1].value;
     const previousValue =
@@ -189,7 +190,7 @@ const AssetsPage: React.FC = () => {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {formatCurrency(asset.totalDeposits)}
+                            {formatCurrency(asset.totalDeposits || 0)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             {getSavingsGoalName(asset.savingsGoalId)}
@@ -245,11 +246,13 @@ const AssetsPage: React.FC = () => {
                 <div className="mb-4">
                   <p className="text-sm text-gray-600">
                     Last updated:{" "}
-                    {new Date(
-                      selectedAssetData.historicalValues[
-                        selectedAssetData.historicalValues.length - 1
-                      ].date
-                    ).toLocaleDateString()}
+                    {selectedAssetData.historicalValues &&
+                      selectedAssetData.historicalValues.length > 0 &&
+                      new Date(
+                        selectedAssetData.historicalValues[
+                          selectedAssetData.historicalValues.length - 1
+                        ].date
+                      ).toLocaleDateString()}
                   </p>
                   {getValueChange(selectedAssetData) !== null && (
                     <p className="text-sm text-gray-600">
@@ -268,11 +271,11 @@ const AssetsPage: React.FC = () => {
                   )}
                   <p className="text-sm text-gray-600">
                     Total deposits:{" "}
-                    {formatCurrency(selectedAssetData.totalDeposits)}
+                    {formatCurrency(selectedAssetData.totalDeposits || 0)}
                   </p>
                 </div>
                 <AssetValueChart
-                  data={selectedAssetData.historicalValues}
+                  data={selectedAssetData.historicalValues || []}
                   height={400}
                 />
               </InfoCard>

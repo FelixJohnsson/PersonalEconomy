@@ -123,26 +123,6 @@ const BudgetPlanner: React.FC = () => {
     }
   }, [budgetItems, setBudgetItems]);
 
-  // Handle income changes
-  const handleIncomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value) || 0;
-    setGrossMonthlyIncome(value);
-
-    // Update net income after subscriptions
-    const incomeAfterSubscriptions = value - monthlySubscriptionCosts;
-    setMonthlyIncome(incomeAfterSubscriptions);
-
-    // Update amounts based on percentages when in percentage mode
-    if (editMode === "percentage") {
-      setBudgetItemsLocal((prevItems) =>
-        prevItems.map((item) => ({
-          ...item,
-          amount: (item.percentage / 100) * incomeAfterSubscriptions,
-        }))
-      );
-    }
-  };
-
   // Handle changing budget allocation
   const handleBudgetChange = (index: number, value: number) => {
     setBudgetItemsLocal((prevItems) => {

@@ -2,20 +2,16 @@ import React, { useState, useRef } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import Button from "../../buttons/Button";
 import Card from "../../cards/Card";
+import { Expense } from "../../../types";
+import {
+  ExpenseFormData,
+  expenseFromForm,
+  expenseToForm,
+} from "../../../types/forms";
 
 interface ExpenseSetupFormProps {
   onNext: () => void;
   onBack: () => void;
-}
-
-interface ExpenseFormData {
-  name: string;
-  amount: string;
-  category: string;
-  isRecurring: boolean;
-  frequency: "monthly" | "annual";
-  date: string;
-  id?: string;
 }
 
 // Common expense categories
@@ -47,17 +43,7 @@ const ExpenseSetupForm: React.FC<ExpenseSetupFormProps> = ({
 }) => {
   const { addExpense, expenses, deleteExpense } = useAppContext();
   const [expenseItems, setExpenseItems] = useState<ExpenseFormData[]>(
-    expenses.length > 0
-      ? expenses.map((expense) => ({
-          name: expense.name,
-          amount: expense.amount.toString(),
-          category: expense.category,
-          isRecurring: expense.isRecurring || false,
-          frequency: expense.frequency || "monthly",
-          date: expense.date || new Date().toISOString().split("T")[0],
-          id: expense.id,
-        }))
-      : [{ ...initialExpense }]
+    expenses.length > 0 ? expenses.map(expenseToForm) : [{ ...initialExpense }]
   );
   const [currentExpenseIndex, setCurrentExpenseIndex] = useState<number>(0);
   const isSubmitting = useRef(false);
@@ -125,14 +111,9 @@ const ExpenseSetupForm: React.FC<ExpenseSetupFormProps> = ({
     // Add new expenses (only if they don't have an ID)
     validExpenses.forEach((item) => {
       if (!item.id) {
-        addExpense({
-          name: item.name,
-          amount: parseFloat(item.amount),
-          category: item.category,
-          isRecurring: item.isRecurring,
-          frequency: item.frequency,
-          date: item.date,
-        });
+        // Convert form data to proper expense format
+        const expenseData = expenseFromForm(item);
+        addExpense(expenseData);
       }
     });
 

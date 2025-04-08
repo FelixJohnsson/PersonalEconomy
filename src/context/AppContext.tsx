@@ -1,4 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useAuth } from "./AuthContext";
+import { syncUserDataFromMongoDB } from "../utils/dbSync";
+import {
+  apiRequest,
+  incomeApi,
+  expenseApi,
+  assetApi,
+  liabilityApi,
+  IncomePayload,
+} from "../services/api";
 import {
   Income,
   Expense,
@@ -33,7 +43,7 @@ interface AppContextType {
   isLoading: boolean;
 
   // Income methods
-  addIncome: (income: Omit<Income, "id">) => void;
+  addIncome: (income: Omit<Income, "_id">) => void;
   updateIncome: (income: Income) => void;
   deleteIncome: (id: string) => void;
 
@@ -100,6 +110,10 @@ interface AppContextType {
   // Data import/export methods
   exportData: () => string;
   importData: (jsonData: string) => boolean;
+
+  // Add new sync method
+  syncWithMongoDB: () => Promise<boolean>;
+  useMongoDBData: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -115,6 +129,8 @@ export const useAppContext = () => {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const { isAuthenticated, updateUser, user } = useAuth();
+
   // State with initialization flag
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -125,232 +141,328 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [budgetItems, setBudgetItemsState] = useState<BudgetItem[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [taxReturns, setTaxReturns] = useState<TaxReturn[]>([]);
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isFirstTimeUser, setIsFirstTimeUser] = useState<boolean>(true);
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState<boolean>(
+    user ? !user.isSetupComplete : true
+  );
+  const [useMongoDBData, setUseMongoDBData] = useState<boolean>(true);
 
-  // Load data from localStorage on mount
+  // Load data from MongoDB if authenticated
   useEffect(() => {
-    const loadData = () => {
-      try {
-        setIsLoading(true);
-        let hasData = false;
+    const fetchMongoDBData = async () => {
+      if (isAuthenticated) {
+        console.log(
+          "🔄 AppContext: User is authenticated, fetching data from MongoDB"
+        );
+        try {
+          setIsLoading(true);
+          await syncUserDataFromMongoDB({
+            setIncomes,
+            setExpenses,
+            setAssets,
+            setLiabilities,
+          });
+          setUseMongoDBData(true);
+          console.log("✅ AppContext: Successfully loaded data from MongoDB");
 
-        // Check if user has completed setup before
-        const setupCompleted = localStorage.getItem("setupCompleted");
-        if (setupCompleted === "true") {
-          setIsFirstTimeUser(false);
-        }
-
-        const storedIncomes = localStorage.getItem("incomes");
-        if (storedIncomes) {
-          setIncomes(JSON.parse(storedIncomes));
-          hasData = true;
-        }
-
-        const storedExpenses = localStorage.getItem("expenses");
-        if (storedExpenses) {
-          setExpenses(JSON.parse(storedExpenses));
-          hasData = true;
-        }
-
-        const storedAssets = localStorage.getItem("assets");
-        if (storedAssets) {
-          setAssets(JSON.parse(storedAssets));
-          hasData = true;
-        }
-
-        const storedLiabilities = localStorage.getItem("liabilities");
-
-        if (storedLiabilities) {
-          setLiabilities(JSON.parse(storedLiabilities));
-          hasData = true;
-        }
-
-        const storedSavingsGoals = localStorage.getItem("savingsGoals");
-
-        if (storedSavingsGoals) {
-          setSavingsGoals(JSON.parse(storedSavingsGoals));
-          hasData = true;
-        }
-
-        const storedSubscriptions = localStorage.getItem("subscriptions");
-
-        if (storedSubscriptions) {
-          setSubscriptions(JSON.parse(storedSubscriptions));
-          hasData = true;
-        }
-
-        const storedBudgetItems = localStorage.getItem("budgetItems");
-
-        if (storedBudgetItems) {
-          setBudgetItemsState(JSON.parse(storedBudgetItems));
-          hasData = true;
-        }
-
-        const storedNotes = localStorage.getItem("notes");
-        if (storedNotes) {
-          setNotes(JSON.parse(storedNotes));
-          hasData = true;
-        }
-
-        const storedTaxReturns = localStorage.getItem("taxReturns");
-        if (storedTaxReturns) {
-          setTaxReturns(JSON.parse(storedTaxReturns));
-          hasData = true;
-        }
-
-        // Initialize with sample data if no data exists
-        if (!hasData) {
-          console.log(
-            "No data found in localStorage, initializing empty state"
+          // Set first-time user status based on user profile
+          if (user) {
+            setIsFirstTimeUser(!user.isSetupComplete);
+          }
+        } catch (error) {
+          console.error(
+            "❌ AppContext: Error loading data from MongoDB:",
+            error
           );
-          // We no longer automatically load sample data for first-time users
-          // They'll go through the setup process instead
+          setUseMongoDBData(false);
+        } finally {
+          setIsLoading(false);
         }
-
-        // Mark initialization as complete
-        setIsInitialized(true);
-      } catch (error) {
-        console.error("Error loading data from localStorage:", error);
-      } finally {
-        setIsLoading(false);
       }
     };
 
-    loadData();
-  }, []);
-
-  // Save data to localStorage when state changes (but only after initialization)
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("incomes", JSON.stringify(incomes));
+    if (isAuthenticated) {
+      fetchMongoDBData();
+    } else {
+      setIsLoading(false);
     }
-  }, [incomes, isInitialized]);
+  }, [isAuthenticated, user]);
 
+  // Update first-time user status when user changes
   useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("expenses", JSON.stringify(expenses));
+    if (user) {
+      setIsFirstTimeUser(!user.isSetupComplete);
     }
-  }, [expenses, isInitialized]);
-
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("assets", JSON.stringify(assets));
-    }
-  }, [assets, isInitialized]);
-
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("liabilities", JSON.stringify(liabilities));
-    }
-  }, [liabilities, isInitialized]);
-
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("savingsGoals", JSON.stringify(savingsGoals));
-    }
-  }, [savingsGoals, isInitialized]);
-
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("subscriptions", JSON.stringify(subscriptions));
-    }
-  }, [subscriptions, isInitialized]);
-
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("budgetItems", JSON.stringify(budgetItems));
-    }
-  }, [budgetItems, isInitialized]);
-
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("notes", JSON.stringify(notes));
-    }
-  }, [notes, isInitialized]);
-
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("taxReturns", JSON.stringify(taxReturns));
-    }
-  }, [taxReturns, isInitialized]);
+  }, [user]);
 
   // Income methods
-  const addIncome = (income: Omit<Income, "id">) => {
-    const newIncome = { ...income, id: Date.now().toString() };
-    setIncomes([...incomes, newIncome]);
+  const addIncome = async (income: Omit<Income, "_id">) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log("📝 AppContext: Adding income to MongoDB");
+
+        const newIncome = await incomeApi.createIncome(income);
+        setIncomes([...incomes, newIncome]);
+      } else {
+        console.warn("Error adding income", income);
+      }
+    } catch (error) {
+      console.error(
+        "❌ AppContext: Error adding income:",
+        error,
+        "useMongoDBData",
+        useMongoDBData,
+        "isAuthenticated",
+        isAuthenticated
+      );
+    }
   };
 
-  const updateIncome = (income: Income) => {
-    setIncomes(incomes.map((i) => (i.id === income.id ? income : i)));
+  const updateIncome = async (income: Income) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Updating income in MongoDB: ${income.id}`);
+        console.log("Income object to update:", income);
+
+        // Map to API payload format
+        const incomePayload: Partial<IncomePayload> = {
+          name: income.name,
+          amount: income.amount,
+          frequency: income.frequency,
+          category: income.category,
+          date: new Date().toISOString().split("T")[0], // Use current date if not provided
+          isRecurring: false,
+        };
+
+        // Handle gross amount and tax rate if available
+        if (income.grossAmount !== undefined)
+          incomePayload.grossAmount = income.grossAmount;
+        if (income.netAmount !== undefined)
+          incomePayload.netAmount = income.netAmount;
+        if (income.taxRate !== undefined)
+          incomePayload.taxRate = income.taxRate;
+
+        // Use MongoDB _id if available, otherwise use the income.id
+        const id = (income as any)._id || income.id;
+        console.log("Using ID for update:", id);
+
+        const updatedIncome = await incomeApi.updateIncome(id, incomePayload);
+        console.log("Income after update:", updatedIncome);
+
+        // Update the local state with the returned income from MongoDB
+        setIncomes(
+          incomes.map((i) => {
+            // Compare with either _id or id
+            const matchesId =
+              String(i.id) === String(income.id) ||
+              String((i as any)._id) === String(income.id);
+
+            return matchesId ? updatedIncome : i;
+          })
+        );
+      } else {
+        setIncomes(incomes.map((i) => (i.id === income.id ? income : i)));
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating income:", error);
+    }
   };
 
-  const deleteIncome = (id: string) => {
-    setIncomes(incomes.filter((i) => i.id !== id));
+  const deleteIncome = async (id: string) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Deleting income from MongoDB: ${id}`);
+
+        // Find the income to be deleted to check if it has _id
+        const incomeToDelete = incomes.find((i) => String(i.id) === String(id));
+        if (!incomeToDelete) {
+          console.error(`❌ AppContext: Income with ID ${id} not found`);
+          return;
+        }
+
+        // Use MongoDB _id if available
+        const mongoId = (incomeToDelete as any)._id || id;
+        console.log(`Using ID for deletion: ${mongoId}`);
+
+        await incomeApi.deleteIncome(mongoId);
+      }
+      // Remove from local state
+      setIncomes(incomes.filter((i) => String(i.id) !== String(id)));
+    } catch (error) {
+      console.error("❌ AppContext: Error deleting income:", error);
+    }
   };
 
   // Expense methods
-  const addExpense = (expense: Omit<Expense, "id">) => {
-    const newExpense = {
-      ...expense,
-      id: Date.now().toString(),
-      date: expense.date || new Date().toISOString().split("T")[0],
-    };
-    setExpenses((prev) => [...prev, newExpense]);
+  const addExpense = async (expense: Omit<Expense, "id">) => {
+    try {
+      const expenseWithDate = {
+        ...expense,
+        date: expense.date || new Date().toISOString().split("T")[0],
+      };
+
+      if (useMongoDBData && isAuthenticated) {
+        console.log("📝 AppContext: Adding expense to MongoDB");
+        const newExpense = await expenseApi.createExpense(expenseWithDate);
+        setExpenses((prev) => [...prev, newExpense]);
+      } else {
+        const newExpense = {
+          ...expenseWithDate,
+          id: Date.now().toString(),
+        };
+        setExpenses((prev) => [...prev, newExpense]);
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error adding expense:", error);
+    }
   };
 
-  const updateExpense = (updatedExpense: Expense) => {
-    setExpenses((prev) =>
-      prev.map((expense) =>
-        expense.id === updatedExpense.id
-          ? {
-              ...updatedExpense,
-              date:
-                updatedExpense.date ||
-                expense.date ||
-                new Date().toISOString().split("T")[0],
-            }
-          : expense
-      )
-    );
+  const updateExpense = async (updatedExpense: Expense) => {
+    try {
+      const expenseWithDate = {
+        ...updatedExpense,
+        date: updatedExpense.date || new Date().toISOString().split("T")[0],
+      };
+
+      if (useMongoDBData && isAuthenticated) {
+        console.log(
+          `📝 AppContext: Updating expense in MongoDB: ${updatedExpense.id}`
+        );
+        const result = await expenseApi.updateExpense(
+          updatedExpense.id,
+          expenseWithDate
+        );
+        setExpenses((prev) =>
+          prev.map((expense) =>
+            expense.id === updatedExpense.id ? result : expense
+          )
+        );
+      } else {
+        setExpenses((prev) =>
+          prev.map((expense) =>
+            expense.id === updatedExpense.id ? expenseWithDate : expense
+          )
+        );
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating expense:", error);
+    }
   };
 
-  const deleteExpense = (id: string) => {
-    setExpenses(expenses.filter((e) => e.id !== id));
+  const deleteExpense = async (id: string) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Deleting expense from MongoDB: ${id}`);
+        await expenseApi.deleteExpense(id);
+      }
+      setExpenses(expenses.filter((e) => e.id !== id));
+    } catch (error) {
+      console.error("❌ AppContext: Error deleting expense:", error);
+    }
   };
 
   // Asset methods
-  const addAsset = (asset: Omit<Asset, "id">) => {
-    const newAsset: Asset = {
-      ...asset,
-      id: generateId(),
-    };
-    setAssets((prev) => [...prev, newAsset]);
+  const addAsset = async (asset: Omit<Asset, "id">) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log("📝 AppContext: Adding asset to MongoDB");
+        const newAsset = await assetApi.createAsset({
+          ...asset,
+          id: generateId(),
+        });
+        setAssets((prev) => [...prev, newAsset]);
+      } else {
+        const newAsset: Asset = {
+          ...asset,
+          id: generateId(),
+        };
+        setAssets((prev) => [...prev, newAsset]);
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error adding asset:", error);
+    }
   };
 
-  const updateAsset = (asset: Asset) => {
-    setAssets((prev) => prev.map((a) => (a.id === asset.id ? asset : a)));
+  const updateAsset = async (asset: Asset) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Updating asset in MongoDB: ${asset.id}`);
+        const updatedAsset = await assetApi.updateAsset(asset.id, asset);
+        setAssets((prev) =>
+          prev.map((a) => (a.id === asset.id ? updatedAsset : a))
+        );
+      } else {
+        setAssets((prev) => prev.map((a) => (a.id === asset.id ? asset : a)));
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating asset:", error);
+    }
   };
 
-  const deleteAsset = (assetId: string) => {
-    setAssets((prev) => prev.filter((asset) => asset.id !== assetId));
+  const deleteAsset = async (assetId: string) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Deleting asset from MongoDB: ${assetId}`);
+        await assetApi.deleteAsset(assetId);
+      }
+      setAssets((prev) => prev.filter((asset) => asset.id !== assetId));
+    } catch (error) {
+      console.error("❌ AppContext: Error deleting asset:", error);
+    }
   };
 
   // Liability methods
-  const addLiability = (liability: Omit<Liability, "id">) => {
-    const newLiability = { ...liability, id: Date.now().toString() };
-    setLiabilities([...liabilities, newLiability]);
+  const addLiability = async (liability: Omit<Liability, "id">) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log("📝 AppContext: Adding liability to MongoDB");
+        const newLiability = await liabilityApi.createLiability(liability);
+        setLiabilities((prev) => [...prev, newLiability]);
+      } else {
+        const newLiability = {
+          ...liability,
+          id: generateId(),
+        };
+        setLiabilities((prev) => [...prev, newLiability]);
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error adding liability:", error);
+    }
   };
 
-  const updateLiability = (liability: Liability) => {
-    setLiabilities(
-      liabilities.map((l) => (l.id === liability.id ? liability : l))
-    );
+  const updateLiability = async (liability: Liability) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(
+          `📝 AppContext: Updating liability in MongoDB: ${liability.id}`
+        );
+        const updatedLiability = await liabilityApi.updateLiability(
+          liability.id,
+          liability
+        );
+        setLiabilities((prev) =>
+          prev.map((l) => (l.id === liability.id ? updatedLiability : l))
+        );
+      } else {
+        setLiabilities((prev) =>
+          prev.map((l) => (l.id === liability.id ? liability : l))
+        );
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating liability:", error);
+    }
   };
 
-  const deleteLiability = (id: string) => {
-    setLiabilities(liabilities.filter((l) => l.id !== id));
+  const deleteLiability = async (id: string) => {
+    try {
+      if (useMongoDBData && isAuthenticated) {
+        console.log(`📝 AppContext: Deleting liability from MongoDB: ${id}`);
+        await liabilityApi.deleteLiability(id);
+      }
+      setLiabilities((prev) => prev.filter((liability) => liability.id !== id));
+    } catch (error) {
+      console.error("❌ AppContext: Error deleting liability:", error);
+    }
   };
 
   // Subscription methods
@@ -571,49 +683,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   };
 
-  const updateAssetValue = (assetId: string, newValue: number) => {
-    setAssets((prev) =>
-      prev.map((asset) => {
-        if (asset.id === assetId) {
-          const today = new Date().toISOString().split("T")[0];
-          return {
-            ...asset,
-            value: newValue,
-            historicalValues: [
-              ...asset.historicalValues,
-              { date: today, value: newValue } as AssetValue,
-            ],
-          };
+  const updateAssetValue = async (assetId: string, newValue: number) => {
+    try {
+      const assetsCopy = [...assets];
+      const asset = assetsCopy.find((a) => a.id === assetId);
+
+      if (!asset) return;
+
+      const date = new Date().toISOString().split("T")[0];
+      const assetValue: AssetValue = { date, value: newValue };
+
+      // Add to values array if it doesn't exist or update it
+      if (!asset.values) {
+        asset.values = [assetValue];
+      } else {
+        const existingValueIndex = asset.values.findIndex(
+          (v: AssetValue) => v.date === date
+        );
+        if (existingValueIndex >= 0) {
+          asset.values[existingValueIndex] = assetValue;
+        } else {
+          asset.values.push(assetValue);
         }
-        return asset;
-      })
-    );
+      }
+
+      // Update the current value
+      asset.value = newValue;
+
+      if (useMongoDBData && isAuthenticated) {
+        console.log(
+          `📝 AppContext: Updating asset value in MongoDB: ${assetId}`
+        );
+        await assetApi.updateAssetValue(assetId, { value: newValue, date });
+      }
+
+      setAssets(assetsCopy);
+    } catch (error) {
+      console.error("❌ AppContext: Error updating asset value:", error);
+    }
   };
 
-  const addAssetDeposit = (assetId: string, depositAmount: number) => {
-    setAssets((prev) =>
-      prev.map((asset) => {
-        if (asset.id === assetId) {
-          const today = new Date().toISOString().split("T")[0];
-          const newValue = asset.value + depositAmount;
-          return {
-            ...asset,
-            value: newValue,
-            totalDeposits: asset.totalDeposits + depositAmount,
-            historicalValues: [
-              ...asset.historicalValues,
-              {
-                date: today,
-                value: newValue,
-                isDeposit: true,
-                depositAmount,
-              } as AssetValue,
-            ],
-          };
-        }
-        return asset;
-      })
-    );
+  const addAssetDeposit = async (assetId: string, depositAmount: number) => {
+    try {
+      const assetsCopy = [...assets];
+      const asset = assetsCopy.find((a) => a.id === assetId);
+
+      if (!asset) return;
+
+      const date = new Date().toISOString().split("T")[0];
+      const deposit = { date, amount: depositAmount };
+
+      // Add to deposits array if it doesn't exist
+      if (!asset.deposits) {
+        asset.deposits = [deposit];
+      } else {
+        asset.deposits.push(deposit);
+      }
+
+      // Update the current value by adding deposit
+      asset.value += depositAmount;
+
+      if (useMongoDBData && isAuthenticated) {
+        console.log(
+          `📝 AppContext: Adding asset deposit in MongoDB: ${assetId}`
+        );
+        await assetApi.addAssetDeposit(assetId, {
+          amount: depositAmount,
+          date,
+        });
+      }
+
+      setAssets(assetsCopy);
+    } catch (error) {
+      console.error("❌ AppContext: Error adding asset deposit:", error);
+    }
   };
 
   // Budget methods
@@ -679,9 +822,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // Mark setup as complete
-  const completeSetup = () => {
-    localStorage.setItem("setupCompleted", "true");
-    setIsFirstTimeUser(false);
+  const completeSetup = async () => {
+    try {
+      console.log("🔄 AppContext: Marking setup as complete");
+      setIsFirstTimeUser(false);
+
+      // Update user's setup status in the database
+      if (isAuthenticated) {
+        // Make API call to update user's setup status
+        await apiRequest("/api/users/profile", "PUT", {
+          isSetupComplete: true,
+        });
+
+        // Update local user state
+        updateUser({ isSetupComplete: true });
+
+        console.log("✅ AppContext: User setup status updated in database");
+      }
+    } catch (error) {
+      console.error("❌ AppContext: Error updating setup status:", error);
+      // Still mark as complete locally even if the API call fails
+      setIsFirstTimeUser(false);
+    }
   };
 
   // Data export - returns JSON string of all data
@@ -732,6 +894,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (error) {
       console.error("Error importing data:", error);
       return false;
+    }
+  };
+
+  // Add new method to manually sync with MongoDB
+  const syncWithMongoDB = async () => {
+    if (!isAuthenticated) {
+      console.log(
+        "⚠️ AppContext: User not authenticated, cannot sync with MongoDB"
+      );
+      return false;
+    }
+
+    try {
+      setIsLoading(true);
+      await syncUserDataFromMongoDB({
+        setIncomes,
+        setExpenses,
+        setAssets,
+        setLiabilities,
+      });
+      console.log("✅ AppContext: Manual sync with MongoDB successful");
+      return true;
+    } catch (error) {
+      console.error("❌ AppContext: Manual sync with MongoDB failed:", error);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -818,6 +1007,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         // Data import/export
         exportData,
         importData,
+
+        // Add new sync method
+        syncWithMongoDB,
+        useMongoDBData,
       }}
     >
       {children}

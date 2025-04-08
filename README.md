@@ -25,27 +25,39 @@ Economy Tracker offers a wide range of financial management tools:
 ## Technology Stack
 
 - **Frontend**: React, TypeScript, TailwindCSS
+- **Backend**: Node.js, Express
+- **Database**: MongoDB with Mongoose
 - **State Management**: React Context API
 - **Data Visualization**: Recharts
 - **Routing**: React Router
-- **Storage**: Currently using localStorage (with plans to migrate to a database)
+- **Authentication**: JWT (JSON Web Tokens)
 
-## Current Data Storage
+## Data Storage
 
-The application currently uses browser localStorage for data persistence. This means:
+The application now uses MongoDB for data persistence, replacing the previous localStorage implementation. This provides several benefits:
 
-- Data is stored locally in the user's browser
-- Data will persist between sessions on the same device/browser
-- Data is NOT synchronized between different devices
-- Data may be lost if the browser storage is cleared
+- Secure storage of financial data
+- Multi-device access through user authentication
+- Data backup and recovery capabilities
+- Scalability for growing financial data
+- Ability to share data with family members (future feature)
 
-## Future Database Plans
+### MongoDB Database Structure
 
-We plan to migrate from localStorage to a proper database solution. Options being considered:
+The MongoDB database contains collections for all financial data categories:
 
-1. **MongoDB** - A document-oriented database that works well with our existing data structure
-2. **Firebase Firestore** - For real-time updates and built-in authentication
-3. **PostgreSQL** - For more complex financial calculations and relationships
+- Users (with authentication)
+- Incomes
+- Expenses
+- Assets
+- Liabilities
+- Savings Goals
+- Subscriptions
+- Budget Items
+- Notes
+- Tax Returns
+
+Each data collection is secured with user-specific access control.
 
 ## Getting Started
 
@@ -53,6 +65,7 @@ We plan to migrate from localStorage to a proper database solution. Options bein
 
 - Node.js (v14 or newer)
 - npm or yarn
+- MongoDB (local installation or MongoDB Atlas account)
 
 ### Installation
 
@@ -63,50 +76,109 @@ We plan to migrate from localStorage to a proper database solution. Options bein
    cd economy-tracker
    ```
 
-2. Install dependencies:
+2. Install frontend dependencies:
 
    ```
    npm install
    ```
 
-   or
+3. Install backend dependencies:
 
    ```
-   yarn install
+   cd server
+   npm install
+   cd ..
    ```
 
-3. Start the development server:
+4. Configure environment variables:
+   Create a `.env` file in the root directory with the following variables:
+
+   ```
+   # MongoDB Connection
+   MONGODB_URI=mongodb://localhost:27017/economy-tracker
+
+   # Server Configuration
+   PORT=5000
+   NODE_ENV=development
+
+   # JWT Secret for Authentication
+   JWT_SECRET=your-secret-key-here
+   JWT_EXPIRE=30d
+
+   # CORS Configuration
+   CLIENT_URL=http://localhost:3000
+   ```
+
+5. Start the backend server:
+
+   ```
+   cd server
+   npm run dev
+   ```
+
+6. In a new terminal, start the frontend:
 
    ```
    npm start
    ```
 
-   or
-
-   ```
-   yarn start
-   ```
-
-4. Open [http://localhost:3000](http://localhost:3000) to view the app in your browser.
+7. Open [http://localhost:3000](http://localhost:3000) to view the app in your browser.
 
 ## Building for Production
 
 To build the app for production:
 
 ```
+# Build the frontend
 npm run build
-```
 
-This creates an optimized production build in the `build` folder.
+# Prepare the backend for production
+cd server
+npm install --production
+```
 
 ## Project Structure
 
-- `/src/components`: Reusable UI components
-- `/src/context`: Application state and data management
-- `/src/pages`: Main application pages
-- `/src/types`: TypeScript type definitions
-- `/src/utils`: Utility functions and helpers
-- `/src/services`: Service layers for data processing
+- `/src` - Frontend application code
+
+  - `/components`: Reusable UI components
+  - `/context`: Application state and data management
+  - `/pages`: Main application pages
+  - `/types`: TypeScript type definitions
+  - `/utils`: Utility functions and helpers
+  - `/services`: API service layers for backend communication
+
+- `/server` - Backend application code
+  - `/src/config`: Configuration files
+  - `/src/controllers`: Request handlers
+  - `/src/middleware`: Custom middleware functions
+  - `/src/models`: Mongoose data models
+  - `/src/routes`: API route definitions
+  - `/src/utils`: Utility functions
+
+## API Endpoints
+
+The backend provides the following API endpoints:
+
+- **Authentication**
+
+  - `POST /api/users` - Register a new user
+  - `POST /api/users/login` - Login and get token
+  - `GET /api/users/profile` - Get user profile
+  - `PUT /api/users/profile` - Update user profile
+
+- **Financial Data** (all require authentication)
+  - `/api/incomes` - Income management
+  - `/api/expenses` - Expense tracking
+  - `/api/assets` - Asset management
+  - `/api/liabilities` - Liability tracking
+  - `/api/savings-goals` - Savings goal management
+  - `/api/subscriptions` - Subscription management
+  - `/api/budget` - Budget planning
+  - `/api/notes` - Notes management
+  - `/api/tax-returns` - Tax return records
+
+Each resource supports standard CRUD operations.
 
 ## Contributing
 

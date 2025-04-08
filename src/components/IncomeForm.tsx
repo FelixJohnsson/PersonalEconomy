@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAppContext } from "../context/AppContext";
-import { Income } from "../types";
+import { Income, IncomeFrequency } from "../types";
 import Card from "./cards/Card";
 import Button from "./buttons/Button";
 
@@ -14,14 +14,20 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
 
   const [name, setName] = useState(initialIncome?.name || "");
   const [grossAmount, setGrossAmount] = useState(
-    initialIncome?.grossAmount || initialIncome?.amount || 0
+    initialIncome?.grossAmount || 0
   );
-  const [taxRate, setTaxRate] = useState(initialIncome?.taxRate || 30); // Default tax rate of 30%
+  const [taxRate, setTaxRate] = useState(initialIncome?.taxRate || 23); // Default tax rate of 30%
   const [netAmount, setNetAmount] = useState(initialIncome?.netAmount || 0);
-  const [frequency, setFrequency] = useState<"monthly" | "annual">(
-    initialIncome?.frequency || "monthly"
+  const [isRecurring, setIsRecurring] = useState<boolean>(
+    initialIncome?.isRecurring || true
   );
-  const [category, setCategory] = useState(initialIncome?.category || "Salary");
+  const [frequency, setFrequency] = useState<IncomeFrequency>(
+    initialIncome?.frequency || IncomeFrequency.MONTHLY
+  );
+  const [category, setCategory] = useState(initialIncome?.type || "Salary");
+  const [date, setDate] = useState(
+    initialIncome?.date || new Date().toISOString().split("T")[0]
+  );
   const [error, setError] = useState("");
 
   // Calculate net amount when gross amount or tax rate changes
@@ -33,21 +39,22 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
   // Update form state when initialIncome changes (for editing)
   useEffect(() => {
     if (initialIncome) {
+      console.log("Initializing form with income:", initialIncome);
       setName(initialIncome.name);
       // If we have grossAmount, use it, otherwise fall back to amount (for backward compatibility)
-      setGrossAmount(initialIncome.grossAmount || initialIncome.amount);
+      setGrossAmount(initialIncome.grossAmount);
       setTaxRate(initialIncome.taxRate || 30);
-      setNetAmount(initialIncome.netAmount || initialIncome.amount);
+      setNetAmount(initialIncome.netAmount);
+      setIsRecurring(initialIncome.isRecurring);
       setFrequency(initialIncome.frequency);
-      setCategory(initialIncome.category);
+      setCategory(initialIncome.type);
+      setDate(initialIncome.date || new Date().toISOString().split("T")[0]);
       setError("");
     }
   }, [initialIncome]);
 
-  // Update gross amount when net amount changes
   const handleNetAmountChange = (value: number) => {
     setNetAmount(value);
-    // Calculate gross amount based on net amount and tax rate
     const calculatedGrossAmount = value / (1 - taxRate / 100);
     setGrossAmount(Math.round(calculatedGrossAmount * 100) / 100);
   };
@@ -70,30 +77,47 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
       return;
     }
 
-    const incomeData: Omit<Income, "id"> = {
+    if (!date) {
+      setError("Please select a date");
+      return;
+    }
+
+    const incomeData = {
       name,
-      amount: netAmount, // Keep amount as netAmount for backward compatibility
-      grossAmount,
-      netAmount,
-      taxRate,
+      amount: grossAmount.toString(), // For form compatibility
+      grossAmount: grossAmount.toString(),
+      netAmount: netAmount.toString(),
+      taxRate: taxRate.toString(),
       frequency,
       category,
+      isRecurring,
+      date,
     };
 
-    if (initialIncome) {
-      updateIncome({ ...incomeData, id: initialIncome.id });
-    } else {
-      addIncome(incomeData);
-    }
+    console.log("Form submitted with data:", incomeData);
+
+    // Convert form data to the format expected by addIncome
+    addIncome({
+      name,
+      grossAmount: parseFloat(grossAmount.toString()),
+      netAmount: parseFloat(netAmount.toString()),
+      taxRate: parseFloat(taxRate.toString()),
+      frequency,
+      type: category,
+      isRecurring,
+      date,
+    });
 
     // Reset form
     if (!initialIncome) {
       setName("");
       setGrossAmount(0);
-      setTaxRate(30);
+      setTaxRate(23);
       setNetAmount(0);
-      setFrequency("monthly");
+      setIsRecurring(true);
+      setFrequency(IncomeFrequency.MONTHLY);
       setCategory("Salary");
+      setDate(new Date().toISOString().split("T")[0]);
     }
 
     setError("");
@@ -200,23 +224,62 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ initialIncome, onSubmit }) => {
           </div>
 
           <div className="mb-4">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isRecurring"
+                name="isRecurring"
+                checked={isRecurring}
+                onChange={(e) => setIsRecurring(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label
+                htmlFor="isRecurring"
+                className="ml-2 block text-sm text-gray-700"
+              >
+                This is a recurring income
+              </label>
+            </div>
+          </div>
+
+          {isRecurring && (
+            <div className="mb-4">
+              <label
+                className="block text-sm font-medium text-gray-700 mb-1"
+                htmlFor="frequency"
+              >
+                Frequency
+              </label>
+              <select
+                id="frequency"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                value={frequency}
+                onChange={(e) =>
+                  setFrequency(e.target.value as IncomeFrequency)
+                }
+              >
+                <option value={IncomeFrequency.MONTHLY}>Monthly</option>
+                <option value={IncomeFrequency.WEEKLY}>Weekly</option>
+                <option value={IncomeFrequency.BIWEEKLY}>Bi-weekly</option>
+                <option value={IncomeFrequency.DAILY}>Daily</option>
+              </select>
+            </div>
+          )}
+
+          <div className="mb-4">
             <label
               className="block text-sm font-medium text-gray-700 mb-1"
-              htmlFor="frequency"
+              htmlFor="date"
             >
-              Frequency
+              Income Date
             </label>
-            <select
-              id="frequency"
+            <input
+              id="date"
+              type="date"
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              value={frequency}
-              onChange={(e) =>
-                setFrequency(e.target.value as "monthly" | "annual")
-              }
-            >
-              <option value="monthly">Monthly</option>
-              <option value="annual">Annual</option>
-            </select>
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
           </div>
 
           <div className="mb-4">

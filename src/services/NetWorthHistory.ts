@@ -22,7 +22,7 @@ export class NetWorthHistoryService {
     const datesSet = new Set<string>();
 
     assets.forEach((asset) => {
-      asset.historicalValues.forEach((historyPoint) => {
+      asset.historicalValues?.forEach((historyPoint) => {
         datesSet.add(historyPoint.date);
       });
     });
@@ -39,12 +39,12 @@ export class NetWorthHistoryService {
       assets.forEach((asset) => {
         // Find the most recent value for this asset on or before the current date
         const assetValuesBeforeDate = asset.historicalValues
-          .filter((historyPoint) => historyPoint.date <= date)
+          ?.filter((historyPoint) => historyPoint.date <= date)
           .sort(
             (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
           );
 
-        if (assetValuesBeforeDate.length > 0) {
+        if (assetValuesBeforeDate && assetValuesBeforeDate.length > 0) {
           totalAssetsValueOnDate += assetValuesBeforeDate[0].value;
         }
       });
@@ -74,7 +74,7 @@ export class NetWorthHistoryService {
    */
   private static getAssetValueOnDate(asset: Asset, targetDate: string): number {
     // Sort historical values by date in descending order
-    const sortedValues = [...asset.historicalValues].sort(
+    const sortedValues = [...(asset.historicalValues ?? [])].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 

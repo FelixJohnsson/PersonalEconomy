@@ -68,14 +68,23 @@ export interface AssetValue {
   depositAmount?: number;
 }
 
+export interface AssetDeposit {
+  date: string;
+  amount: number;
+  notes?: string;
+}
+
 export interface Asset {
   id: string;
   name: string;
   type: AssetCategory;
   value: number;
   savingsGoalId?: string | null;
-  historicalValues: AssetValue[];
-  totalDeposits: number;
+  historicalValues?: AssetValue[]; // Keep for backward compatibility
+  totalDeposits?: number; // Keep for backward compatibility
+  values?: AssetValue[]; // MongoDB model uses this
+  deposits?: AssetDeposit[]; // MongoDB model uses this
+  notes?: string;
 }
 
 export interface ExpenseSummary {
@@ -88,15 +97,26 @@ export interface Period {
   endDate: string;
 }
 
-export interface Income {
-  id: string;
+export enum IncomeFrequency {
+  MONTHLY = "monthly",
+  WEEKLY = "weekly",
+  BIWEEKLY = "biweekly",
+  DAILY = "daily",
+}
+
+export interface IncomeFormData {
   name: string;
-  amount: number; // Keeping for backward compatibility
-  grossAmount?: number; // Before tax amount
-  netAmount?: number; // After tax amount
-  taxRate?: number; // Tax rate as a percentage
-  frequency: "monthly" | "annual";
-  category: string;
+  grossAmount: number;
+  netAmount: number;
+  taxRate: number;
+  frequency: IncomeFrequency;
+  isRecurring: boolean;
+  type: string;
+  date: string;
+}
+
+export interface Income extends IncomeFormData {
+  _id: string;
 }
 
 export interface Liability {
@@ -155,3 +175,33 @@ export interface TaxReturn {
 }
 
 export * from "./Note";
+
+// Export form types
+export * from "./forms";
+
+// Define MongoDB specific types
+export type MongoId = string;
+
+/**
+ * Base MongoDB document type with _id field
+ */
+export interface MongoDoc {
+  _id: MongoId;
+}
+
+/**
+ * Type utility to convert client-side types to MongoDB types
+ * Adds _id field and converts id to _id
+ */
+export type WithMongoId<T extends { id: string }> = Omit<T, "id"> & MongoDoc;
+
+/**
+ * Type utility to convert MongoDB types to client-side types
+ * Renames _id to id and ensures proper typing
+ */
+export type WithClientId<T extends MongoDoc> = Omit<T, "_id"> & { id: string };
+
+/**
+ * Base form data type without ID (for creating new records)
+ */
+export type FormData<T extends { id: string }> = Omit<T, "id">;

@@ -2,6 +2,8 @@ import React from "react";
 import { BrowserRouter, Route, Routes, Link, Navigate } from "react-router-dom";
 import { useAppContext } from "./context/AppContext";
 import { AppProvider } from "./context/AppContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import ExpensesPage from "./pages/ExpensesPage";
 import AssetsPage from "./pages/AssetsPage";
@@ -17,12 +19,35 @@ import SetupPage from "./pages/SetupPage";
 import NetWorthPage from "./pages/NetWorthPage";
 import LiabilitiesPage from "./pages/LiabilitiesPage";
 import WhatIfCalculatorPage from "./pages/WhatIfCalculatorPage";
+import AuthPage from "./pages/AuthPage";
+import ProfilePage from "./pages/ProfilePage";
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+
   return (
     <div className="flex min-h-screen">
       <div className="w-64 bg-gray-800 text-white p-5">
         <h1 className="text-2xl font-bold mb-6">Economy Tracker</h1>
+
+        {/* User info section */}
+        <div className="mb-6 pb-4 border-b border-gray-700">
+          <div className="flex items-center">
+            <div className="bg-gray-600 rounded-full w-10 h-10 flex items-center justify-center text-lg font-semibold">
+              {user?.name.charAt(0)}
+            </div>
+            <div className="ml-3">
+              <div className="font-medium">{user?.name}</div>
+              <Link
+                to="/profile"
+                className="text-xs text-blue-300 hover:text-blue-200"
+              >
+                View Profile
+              </Link>
+            </div>
+          </div>
+        </div>
+
         <nav>
           <ul className="space-y-2">
             <li>
@@ -31,6 +56,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 className="block py-2 px-4 rounded hover:bg-gray-700 transition-colors"
               >
                 Dashboard
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/profile"
+                className="block py-2 px-4 rounded hover:bg-gray-700 transition-colors"
+              >
+                Profile
               </Link>
             </li>
             <li>
@@ -158,10 +191,11 @@ const PlaceholderPage: React.FC<{ name: string }> = ({ name }) => {
 
 // Main App Router
 const AppRouter: React.FC = () => {
-  const { isFirstTimeUser, isLoading } = useAppContext();
+  const { isLoading: appLoading } = useAppContext();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
   // Show loading indicator if data is still loading
-  if (isLoading) {
+  if (authLoading || appLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-center">
@@ -172,144 +206,200 @@ const AppRouter: React.FC = () => {
     );
   }
 
-  // Show setup guide for first-time users
-  if (isFirstTimeUser) {
-    return (
-      <Routes>
-        <Route path="/setup" element={<SetupPage />} />
-        <Route path="*" element={<Navigate to="/setup" replace />} />
-      </Routes>
-    );
-  }
-
-  // Regular routes for returning users
   return (
     <Routes>
+      {/* Auth route - accessible to unauthenticated users */}
       <Route
-        path="/"
+        path="/auth"
+        element={!isAuthenticated ? <AuthPage /> : <Navigate to="/" />}
+      />
+
+      {/* Setup route - for authenticated users who haven't completed setup */}
+      <Route
+        path="/setup"
         element={
-          <Layout>
-            <Dashboard />
-          </Layout>
+          isAuthenticated && !user?.isSetupComplete ? (
+            <SetupPage />
+          ) : isAuthenticated ? (
+            <Navigate to="/" />
+          ) : (
+            <Navigate to="/auth" />
+          )
         }
       />
+
+      {/* Protected routes that require authentication */}
+      <Route element={<ProtectedRoute />}>
+        {/* If user is authenticated but hasn't completed setup, redirect to setup */}
+        <Route
+          path="/"
+          element={
+            !user?.isSetupComplete ? (
+              <Navigate to="/setup" />
+            ) : (
+              <Layout>
+                <Dashboard />
+              </Layout>
+            )
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <Layout>
+              <ProfilePage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/expenses"
+          element={
+            <Layout>
+              <ExpensesPage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/income"
+          element={
+            <Layout>
+              <IncomePage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/subscriptions"
+          element={
+            <Layout>
+              <SubscriptionsPage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/assets"
+          element={
+            <Layout>
+              <AssetsPage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/categories"
+          element={
+            <Layout>
+              <CategoriesPage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/future-tracker"
+          element={
+            <Layout>
+              <FutureTrackerPage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/budget"
+          element={
+            <Layout>
+              <Budget />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/notes"
+          element={
+            <Layout>
+              <Notes />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/tax-returns"
+          element={
+            <Layout>
+              <TaxReturnPage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/liabilities"
+          element={
+            <Layout>
+              <LiabilitiesPage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/net-worth"
+          element={
+            <Layout>
+              <NetWorthPage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/what-if"
+          element={
+            <Layout>
+              <WhatIfCalculatorPage />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <Layout>
+              <SettingsPage />
+            </Layout>
+          }
+        />
+      </Route>
+
+      {/* Fallback redirect */}
       <Route
-        path="/expenses"
+        path="*"
         element={
-          <Layout>
-            <ExpensesPage />
-          </Layout>
+          isAuthenticated ? (
+            !user?.isSetupComplete ? (
+              <Navigate to="/setup" replace />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          ) : (
+            <Navigate to="/auth" replace />
+          )
         }
       />
-      <Route
-        path="/income"
-        element={
-          <Layout>
-            <IncomePage />
-          </Layout>
-        }
-      />
-      <Route
-        path="/subscriptions"
-        element={
-          <Layout>
-            <SubscriptionsPage />
-          </Layout>
-        }
-      />
-      <Route
-        path="/assets"
-        element={
-          <Layout>
-            <AssetsPage />
-          </Layout>
-        }
-      />
-      <Route
-        path="/categories"
-        element={
-          <Layout>
-            <CategoriesPage />
-          </Layout>
-        }
-      />
-      <Route
-        path="/future-tracker"
-        element={
-          <Layout>
-            <FutureTrackerPage />
-          </Layout>
-        }
-      />
-      <Route
-        path="/budget"
-        element={
-          <Layout>
-            <Budget />
-          </Layout>
-        }
-      />
-      <Route
-        path="/notes"
-        element={
-          <Layout>
-            <Notes />
-          </Layout>
-        }
-      />
-      <Route
-        path="/tax-returns"
-        element={
-          <Layout>
-            <TaxReturnPage />
-          </Layout>
-        }
-      />
-      <Route
-        path="/net-worth"
-        element={
-          <Layout>
-            <NetWorthPage />
-          </Layout>
-        }
-      />
-      <Route
-        path="/liabilities"
-        element={
-          <Layout>
-            <LiabilitiesPage />
-          </Layout>
-        }
-      />
-      <Route
-        path="/what-if"
-        element={
-          <Layout>
-            <WhatIfCalculatorPage />
-          </Layout>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <Layout>
-            <SettingsPage />
-          </Layout>
-        }
-      />
-      {/* Redirect any unknown routes to home */}
-      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
 
+// App component with providers
 const App: React.FC = () => {
   return (
-    <AppProvider>
-      <BrowserRouter>
-        <AppRouter />
-      </BrowserRouter>
-    </AppProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppProvider>
+          <AppRouter />
+        </AppProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 

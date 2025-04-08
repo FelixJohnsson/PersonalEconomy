@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import WelcomeStep from "./steps/WelcomeStep";
 import IncomeSetupForm from "./steps/IncomeSetupForm";
@@ -58,6 +59,7 @@ const PlaceholderStep: React.FC<{
 
 const SetupGuide: React.FC = () => {
   const { completeSetup } = useAppContext();
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<SetupStep>(SetupStep.WELCOME);
   const [progress, setProgress] = useState<number>(0);
 
@@ -84,15 +86,36 @@ const SetupGuide: React.FC = () => {
     }
   };
 
-  // Skip to dashboard and load example data
-  const skipSetup = () => {
-    // Mark setup as complete even if user skips
-    completeSetup();
+  // Skip to dashboard and mark setup as complete
+  const skipSetup = async () => {
+    try {
+      // Mark setup as complete even if user skips
+      await completeSetup();
+      console.log("Setup skipped and marked as complete");
+
+      // Redirect to dashboard
+      navigate("/");
+    } catch (error) {
+      console.error("Error during setup skip:", error);
+      // Redirect anyway
+      navigate("/");
+    }
   };
 
   // Complete setup process
-  const finishSetup = () => {
-    completeSetup();
+  const finishSetup = async () => {
+    try {
+      // Call the completeSetup method from AppContext
+      await completeSetup();
+      console.log("Setup completed successfully");
+
+      // Redirect to dashboard
+      navigate("/");
+    } catch (error) {
+      console.error("Error during setup completion:", error);
+      // Redirect anyway since we want to get the user to the app
+      navigate("/");
+    }
   };
 
   // Function to render the current step

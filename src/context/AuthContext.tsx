@@ -90,7 +90,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         _id: response._id,
         name: response.name,
         email: response.email,
-        isSetupComplete: response.isSetupComplete,
+        isSetupComplete: true,
       });
     } catch (error) {
       console.error("❌ AuthContext: Login failed", error);

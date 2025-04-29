@@ -1,12 +1,8 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import asyncHandler from "express-async-handler";
-import Liability from "../models/liabilityModel";
-import { IUser } from "../models/userModel";
-
-// Extend Express Request interface to include user property
-interface UserRequest extends Request {
-  user?: IUser;
-}
+import User from "../models/userModel";
+import mongoose from "mongoose";
+import { findUser, UserRequest } from "../utils/findUser";
 
 /**
  * Get all liabilities for the authenticated user
@@ -14,14 +10,19 @@ interface UserRequest extends Request {
  * @access  Private
  */
 const getLiabilities = asyncHandler(async (req: UserRequest, res: Response) => {
-  if (!req.user) {
-    res.status(401);
+  const user = await findUser(req);
+
+  if (user === 400) {
+    res.status(400);
     throw new Error("Not authorized, no user found");
   }
 
-  const liabilities = await Liability.find({ user: req.user._id });
+  if (user === 404) {
+    res.status(404);
+    throw new Error("User not found");
+  }
 
-  res.status(200).json(liabilities);
+  res.status(200).json(user.liabilities || []);
 });
 
 /**
@@ -31,15 +32,21 @@ const getLiabilities = asyncHandler(async (req: UserRequest, res: Response) => {
  */
 const getLiabilityById = asyncHandler(
   async (req: UserRequest, res: Response) => {
-    if (!req.user) {
-      res.status(401);
+    const user = await findUser(req);
+
+    if (user === 400) {
+      res.status(400);
       throw new Error("Not authorized, no user found");
     }
 
-    const liability = await Liability.findOne({
-      _id: req.params.id,
-      user: req.user._id,
-    });
+    if (user === 404) {
+      res.status(404);
+      throw new Error("User not found");
+    }
+
+    const liability = user.liabilities.find(
+      (liability) => liability._id?.toString() === req.params.id
+    );
 
     if (liability) {
       res.status(200).json(liability);
@@ -57,43 +64,48 @@ const getLiabilityById = asyncHandler(
  */
 const createLiability = asyncHandler(
   async (req: UserRequest, res: Response) => {
-    if (!req.user) {
-      res.status(401);
-      throw new Error("Not authorized, no user found");
-    }
+    try {
+      const user = await findUser(req);
 
-    const {
-      name,
-      amount,
-      interestRate,
-      minimumPayment,
-      dueDate,
-      category,
-      notes,
-    } = req.body;
+      if (user === 400) {
+        res.status(400);
+        throw new Error("Not authorized, no user found");
+      }
 
-    // Check if required fields are provided
-    if (!name || !amount) {
-      res.status(400);
-      throw new Error("Please provide all required fields");
-    }
+      if (user === 404) {
+        res.status(404);
+        throw new Error("User not found");
+      }
 
-    const liability = await Liability.create({
-      user: req.user._id,
-      name,
-      amount,
-      interestRate,
-      minimumPayment,
-      dueDate,
-      category,
-      notes,
-    });
+      const { name, amount, interestRate, minimumPayment, type } = req.body;
 
-    if (liability) {
-      res.status(201).json(liability);
-    } else {
-      res.status(400);
-      throw new Error("Invalid liability data");
+      if (!name || !amount) {
+        res.status(400);
+        throw new Error("Please provide all required fields");
+      }
+
+      const newLiability = {
+        _id: new mongoose.Types.ObjectId(),
+        user: user._id,
+        name,
+        amount,
+        interestRate,
+        minimumPayment,
+        type,
+      };
+
+      await User.updateOne(
+        { _id: user._id },
+        { $push: { liabilities: newLiability } }
+      );
+
+      res.status(201).json(newLiability);
+    } catch (error: any) {
+      console.error("Error creating liability:", error);
+      res.status(500).json({
+        message: "Error creating liability",
+        error: error.message,
+      });
     }
   }
 );
@@ -105,19 +117,9 @@ const createLiability = asyncHandler(
  */
 const updateLiability = asyncHandler(
   async (req: UserRequest, res: Response) => {
-    if (!req.user) {
-      res.status(401);
+    if (!req.user?._id) {
+      res.status(400);
       throw new Error("Not authorized, no user found");
-    }
-
-    const liability = await Liability.findOne({
-      _id: req.params.id,
-      user: req.user._id,
-    });
-
-    if (!liability) {
-      res.status(404);
-      throw new Error("Liability not found");
     }
 
     const {
@@ -128,22 +130,57 @@ const updateLiability = asyncHandler(
       dueDate,
       category,
       notes,
+      type,
     } = req.body;
 
-    // Update liability fields if provided
-    liability.name = name || liability.name;
-    liability.amount = amount !== undefined ? amount : liability.amount;
+    // Build update fields
+    const updateFields: Record<string, any> = {};
 
-    // Update optional fields
-    if (interestRate !== undefined) liability.interestRate = interestRate;
-    if (minimumPayment !== undefined) liability.minimumPayment = minimumPayment;
-    if (dueDate !== undefined) liability.dueDate = dueDate;
-    if (category !== undefined) liability.category = category;
-    if (notes !== undefined) liability.notes = notes;
+    if (name) updateFields["liabilities.$.name"] = name;
+    if (amount !== undefined) updateFields["liabilities.$.amount"] = amount;
+    if (interestRate !== undefined)
+      updateFields["liabilities.$.interestRate"] = interestRate;
+    if (minimumPayment !== undefined)
+      updateFields["liabilities.$.minimumPayment"] = minimumPayment;
+    if (dueDate !== undefined) updateFields["liabilities.$.dueDate"] = dueDate;
+    if (category !== undefined)
+      updateFields["liabilities.$.category"] = category;
+    if (notes !== undefined) updateFields["liabilities.$.notes"] = notes;
+    if (type !== undefined) updateFields["liabilities.$.type"] = type;
 
-    const updatedLiability = await liability.save();
+    if (Object.keys(updateFields).length === 0) {
+      res.status(400);
+      throw new Error("No update fields provided");
+    }
 
-    res.status(200).json(updatedLiability);
+    try {
+      // Use findOneAndUpdate to update specific liability
+      const result = await User.findOneAndUpdate(
+        {
+          _id: req.user._id,
+          "liabilities._id": req.params.id,
+        },
+        { $set: updateFields },
+        { new: true }
+      );
+
+      if (!result) {
+        res.status(404);
+        throw new Error("Liability not found");
+      }
+
+      // Find the updated liability
+      const updatedLiability = result.liabilities.find(
+        (liability) => liability._id.toString() === req.params.id
+      );
+
+      res.status(200).json(updatedLiability);
+    } catch (error: any) {
+      res.status(400).json({
+        message: "Failed to update liability",
+        error: error.message,
+      });
+    }
   }
 );
 
@@ -154,24 +191,35 @@ const updateLiability = asyncHandler(
  */
 const deleteLiability = asyncHandler(
   async (req: UserRequest, res: Response) => {
-    if (!req.user) {
-      res.status(401);
+    if (!req.user?._id) {
+      res.status(400);
       throw new Error("Not authorized, no user found");
     }
 
-    const liability = await Liability.findOne({
-      _id: req.params.id,
-      user: req.user._id,
-    });
+    try {
+      // Use updateOne with $pull to remove the liability
+      const result = await User.updateOne(
+        { _id: req.user._id },
+        { $pull: { liabilities: { _id: req.params.id } } }
+      );
 
-    if (!liability) {
-      res.status(404);
-      throw new Error("Liability not found");
+      if (result.modifiedCount === 0) {
+        res.status(404);
+        throw new Error("Liability not found or already deleted");
+      }
+
+      // Get updated liabilities list
+      const updatedUser = await User.findById(req.user._id);
+      res.status(200).json({
+        message: "Liability removed",
+        liabilities: updatedUser?.liabilities || [],
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        message: "Failed to delete liability",
+        error: error.message,
+      });
     }
-
-    await liability.deleteOne();
-
-    res.status(200).json({ message: "Liability removed" });
   }
 );
 

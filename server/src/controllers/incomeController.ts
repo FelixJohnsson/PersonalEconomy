@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
 import Income, { IncomeType } from "../models/incomeModel";
-import { IUser } from "../models/userModel";
+import User, { IUser } from "../models/userModel";
 
 // Extend Express Request interface to include user property
 interface UserRequest extends Request {
@@ -14,8 +14,8 @@ interface UserRequest extends Request {
  * @access  Private
  */
 const getIncomes = asyncHandler(async (req: UserRequest, res: Response) => {
-  const incomes = await Income.find({ user: req.user?._id });
-  res.json(incomes);
+  const user = await User.findById(req.user?._id);
+  res.json(user?.incomes);
 });
 
 /**
@@ -24,17 +24,14 @@ const getIncomes = asyncHandler(async (req: UserRequest, res: Response) => {
  * @access  Private
  */
 const getIncome = asyncHandler(async (req: UserRequest, res: Response) => {
-  const income = await Income.findById(req.params.id);
+  const user = await User.findById(req.user?._id);
+  const income = user?.incomes.find(
+    (income) => income?._id?.toString() === req.params.id
+  );
 
   if (!income) {
     res.status(404);
     throw new Error("Income not found");
-  }
-
-  // Check if income belongs to user
-  if (income.user.toString() !== req.user?._id?.toString()) {
-    res.status(401);
-    throw new Error("Not authorized to access this income");
   }
 
   res.json(income);
@@ -46,6 +43,11 @@ const getIncome = asyncHandler(async (req: UserRequest, res: Response) => {
  * @access  Private
  */
 const createIncome = asyncHandler(async (req: UserRequest, res: Response) => {
+  if (!req.user) {
+    res.status(401);
+    throw new Error("Not authorized, no user found");
+  }
+
   const incomeData: IncomeType = req.body;
   const {
     name,
@@ -73,14 +75,24 @@ const createIncome = asyncHandler(async (req: UserRequest, res: Response) => {
     throw new Error("Please provide all required fields");
   }
 
-  const newIncomeData = {
+  const newIncome = {
     user: req.user?._id,
     ...incomeData,
   };
 
-  const income = await Income.create(newIncomeData);
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $push: { incomes: newIncome } },
+    { new: true }
+  ).populate("incomes");
 
-  res.status(201).json(income);
+  if (user) {
+    const addedIncome = user.incomes[user.incomes.length - 1];
+    res.status(201).json(addedIncome);
+  } else {
+    res.status(404);
+    throw new Error("User not found");
+  }
 });
 
 /**
@@ -89,26 +101,52 @@ const createIncome = asyncHandler(async (req: UserRequest, res: Response) => {
  * @access  Private
  */
 const updateIncome = asyncHandler(async (req: UserRequest, res: Response) => {
-  const income = await Income.findById(req.params.id);
+  const user = await User.findById(req.user?._id);
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  const income = user?.incomes.find(
+    (income) => income?._id?.toString() === req.params.id
+  );
 
   if (!income) {
     res.status(404);
     throw new Error("Income not found");
   }
 
-  // Check if income belongs to user
-  if (income.user.toString() !== req.user?._id?.toString()) {
-    res.status(401);
-    throw new Error("Not authorized to update this income");
-  }
+  const {
+    name,
+    grossAmount,
+    netAmount,
+    taxRate,
+    frequency,
+    type,
+    date,
+    isRecurring,
+  } = req.body;
 
-  await Income.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
-  });
+  income.name = name || income.name;
+  income.grossAmount =
+    grossAmount !== undefined ? grossAmount : income.grossAmount;
+  income.netAmount = netAmount !== undefined ? netAmount : income.netAmount;
+  income.taxRate = taxRate !== undefined ? taxRate : income.taxRate;
+  income.frequency = frequency !== undefined ? frequency : income.frequency;
+  income.type = type !== undefined ? type : income.type;
+  income.date = date !== undefined ? date : income.date;
+  income.isRecurring =
+    isRecurring !== undefined ? isRecurring : income.isRecurring;
 
-  const allIncomes = await Income.find({ user: req.user?._id });
-  res.json(allIncomes);
+  // Replace the old income with the updated income
+  user.incomes = user.incomes.map((income) =>
+    income._id.toString() === req.params.id ? income : income
+  );
+
+  await user.save();
+
+  res.status(200).json(user.incomes);
 });
 
 /**
@@ -117,22 +155,30 @@ const updateIncome = asyncHandler(async (req: UserRequest, res: Response) => {
  * @access  Private
  */
 const deleteIncome = asyncHandler(async (req: UserRequest, res: Response) => {
-  const income = await Income.findById(req.params.id);
+  try {
+    if (!req.user?._id) {
+      res.status(401);
+      throw new Error("Not authorized, no user found");
+    }
 
-  if (!income) {
-    res.status(404);
-    throw new Error("Income not found");
+    // Use updateOne with $pull to remove the income by ID
+    const result = await User.updateOne(
+      { _id: req.user._id },
+      { $pull: { incomes: { _id: req.params.id } } }
+    );
+
+    if (result.modifiedCount === 0) {
+      res.status(404);
+      throw new Error("Income not found or already deleted");
+    }
+
+    // Get updated list of incomes
+    const updatedUser = await User.findById(req.user._id);
+    res.status(200).json(updatedUser?.incomes || []);
+  } catch (error) {
+    console.error("Error deleting income:", error);
+    res.status(500).json({ message: "Error deleting income" });
   }
-
-  // Check if income belongs to user
-  if (income.user.toString() !== req.user?._id?.toString()) {
-    res.status(401);
-    throw new Error("Not authorized to delete this income");
-  }
-
-  await income.deleteOne();
-
-  res.json({ message: "Income removed" });
 });
 
 export { getIncomes, getIncome, createIncome, updateIncome, deleteIncome };

@@ -128,15 +128,31 @@ export interface ExpenseSummary {
   amount: number;
 }
 
+export enum LiabilityType {
+  CREDIT_CARD = "credit_card",
+  LOAN = "loan",
+  MORTGAGE = "mortgage",
+  OTHER = "other",
+}
+
 export interface Liability {
-  id: string;
+  user: string;
+  name: string;
+  amount: number;
+  type: "credit_card" | "loan" | "mortgage" | "other";
+  interestRate: number;
+  minimumPayment: number;
+  _id: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface LiabilityFormData {
   name: string;
   amount: number;
   interestRate: number;
   minimumPayment: number;
   type: "credit_card" | "loan" | "mortgage" | "other";
 }
-
 export interface SavingsGoal {
   id: string;
   name: string;
@@ -183,4 +199,19 @@ export interface TaxReturn {
   notes?: string;
 }
 
-export * from "./Note";
+export interface Note {
+  _id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  tags?: string[];
+  isPinned: boolean;
+}
+
+export interface NoteFormData {
+  title: string;
+  content: string;
+  tags?: string[];
+  isPinned: boolean;
+}

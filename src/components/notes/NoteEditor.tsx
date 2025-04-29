@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Note } from "../../types/Note";
+import { Note, NoteFormData } from "../../types";
 
 interface NoteEditorProps {
   note?: Note;
-  onSave: (note: Omit<Note, "id" | "createdAt" | "updatedAt">) => void;
+  onSave: (note: NoteFormData) => void;
   onCancel: () => void;
 }
 

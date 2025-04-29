@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { useAppContext } from "../context/AppContext";
-import { EXPENSE_CATEGORIES, BudgetItem, Frequency } from "../types";
+import React, { useState, useEffect, useCallback } from "react";
+import { Frequency } from "../types";
 import { formatCurrency } from "../utils/formatters";
-import { v4 as uuidv4 } from "uuid";
 import { useSubscriptions } from "../hooks/useSubscriptions";
+import { useIncome } from "../hooks/useIncome";
+import { useExpenses } from "../hooks/useExpenses";
+import { useBudget } from "../hooks/useBudget";
+import { EXPENSE_CATEGORIES } from "../types";
 
 const BudgetPlanner: React.FC = () => {
-  const {
-    expenses,
-    incomes,
-    budgetItems: savedBudgetItems,
-    setBudgetItems,
-  } = useAppContext();
+  const { budgets: budgetItems, addBudget, updateBudget } = useBudget();
+
+  const { expenses } = useExpenses();
+  const { incomes } = useIncome();
 
   const { sortedSubscriptions } = useSubscriptions();
 
@@ -19,17 +19,19 @@ const BudgetPlanner: React.FC = () => {
   const [monthlySubscriptionCosts, setMonthlySubscriptionCosts] =
     useState<number>(0);
   const [monthlyIncome, setMonthlyIncome] = useState<number>(0);
-  const [budgetItems, setBudgetItemsLocal] = useState<BudgetItem[]>([]);
   const [editMode, setEditMode] = useState<"amount" | "percentage">("amount");
   const [unallocated, setUnallocated] = useState<number>(0);
   const [unallocatedPercentage, setUnallocatedPercentage] =
     useState<number>(100);
   const [allocated, setAllocated] = useState<number>(0);
   const [allocatedPercentage, setAllocatedPercentage] = useState<number>(0);
+  const [budgetValues, setBudgetValues] = useState<{ [key: string]: number }>(
+    {}
+  );
 
   // Calculate monthly income from all income sources minus subscription costs
   useEffect(() => {
-    // Calculate total monthly income
+    // Calculate monthly income
     const totalMonthlyIncome = incomes.reduce((total, income) => {
       if (income.frequency === Frequency.MONTHLY) {
         return total + income.netAmount;
@@ -44,7 +46,10 @@ const BudgetPlanner: React.FC = () => {
     // Calculate monthly subscription costs
     const subscriptionTotal = sortedSubscriptions.reduce(
       (total, subscription) => {
-        if (subscription.frequency === Frequency.MONTHLY) {
+        if (
+          subscription.frequency === Frequency.MONTHLY &&
+          subscription.category !== "Housing"
+        ) {
           return total + subscription.amount;
         } else if (subscription.frequency === Frequency.YEARLY) {
           return total + subscription.amount / 12;
@@ -59,29 +64,31 @@ const BudgetPlanner: React.FC = () => {
     // Set income as total income minus subscription costs
     const incomeAfterSubscriptions = totalMonthlyIncome - subscriptionTotal;
     setMonthlyIncome(incomeAfterSubscriptions);
-  }, [incomes]);
+  }, [incomes, sortedSubscriptions]);
 
-  // Initialize budget items - either from saved data or with default categories
+  // Initialize budget values from existing budget items
   useEffect(() => {
-    if (savedBudgetItems && savedBudgetItems.length > 0) {
-      // Use saved budget items from context
-      setBudgetItemsLocal(savedBudgetItems);
-    } else {
-      // Initialize with default categories
-      const initialBudgetItems: BudgetItem[] = EXPENSE_CATEGORIES.map(
-        (category) => ({
-          id: uuidv4(),
-          category,
-          amount: 0,
-          percentage: 0,
-        })
-      );
+    const initialValues: { [key: string]: number } = {};
 
-      setBudgetItemsLocal(initialBudgetItems);
-      // Save to context/localStorage
-      setBudgetItems(initialBudgetItems);
-    }
-  }, [savedBudgetItems, setBudgetItems]);
+    // Initialize all categories with 0
+    EXPENSE_CATEGORIES.forEach((category) => {
+      initialValues[category] = 0;
+    });
+
+    // Update with actual values from budget items
+    budgetItems.forEach((item) => {
+      if (item.category) {
+        initialValues[item.category] =
+          editMode === "amount"
+            ? item.amount
+            : monthlyIncome > 0
+            ? (item.amount / monthlyIncome) * 100
+            : 0;
+      }
+    });
+
+    setBudgetValues(initialValues);
+  }, [budgetItems, monthlyIncome, editMode]);
 
   // Calculate unallocated budget whenever budget items change
   useEffect(() => {
@@ -116,50 +123,55 @@ const BudgetPlanner: React.FC = () => {
     );
   }, [budgetItems, monthlyIncome]);
 
-  // Save budget items to context whenever they change
-  useEffect(() => {
-    // Only save if we have items to save and they're not just the initial load
-    if (budgetItems.length > 0) {
-      setBudgetItems(budgetItems);
-    }
-  }, [budgetItems, setBudgetItems]);
-
-  // Handle changing budget allocation
-  const handleBudgetChange = (index: number, value: number) => {
-    setBudgetItemsLocal((prevItems) => {
-      const newItems = [...prevItems];
-
-      if (editMode === "amount") {
-        // First, round the amount to 2 decimal places to avoid tiny decimal imprecision
-        const roundedAmount = Math.round(value * 100) / 100;
-        newItems[index].amount = roundedAmount;
-
-        // Calculate percentage with higher precision than displayed
-        if (monthlyIncome > 0) {
-          // Calculate exact percentage based on amount
-          newItems[index].percentage =
-            Math.round((roundedAmount / monthlyIncome) * 1000) / 10;
-        } else {
-          newItems[index].percentage = 0;
-        }
-      } else {
-        // For percentage mode, store exact percentage (rounded to 1 decimal)
-        const roundedPercentage = Math.round(value * 10) / 10;
-        newItems[index].percentage = roundedPercentage;
-
-        // Update amount based on new percentage - exact calculation to 2 decimal places
-        newItems[index].amount =
-          Math.round((roundedPercentage / 100) * monthlyIncome * 100) / 100;
-      }
-
-      return newItems;
-    });
-  };
-
   // Handle toggling between amount and percentage mode
   const toggleEditMode = () => {
     setEditMode((prev) => (prev === "amount" ? "percentage" : "amount"));
   };
+
+  // Handle budget value change
+  const handleBudgetChange = useCallback(
+    async (category: string, value: number) => {
+      // Update the local state first
+      setBudgetValues((prev) => ({
+        ...prev,
+        [category]: value,
+      }));
+
+      // Calculate the actual amount if in percentage mode
+      const amount =
+        editMode === "percentage" ? (value / 100) * monthlyIncome : value;
+
+      // Find if budget for this category already exists
+      const existingBudget = budgetItems.find(
+        (item) => item.category === category
+      );
+
+      if (existingBudget) {
+        // Update existing budget
+        await updateBudget(existingBudget._id, {
+          amount,
+          category,
+        });
+      } else if (amount > 0) {
+        // Create new budget if amount is greater than 0
+        await addBudget({
+          name: `${category} Budget`,
+          amount,
+          category,
+        });
+      }
+    },
+    [budgetItems, addBudget, updateBudget, editMode, monthlyIncome]
+  );
+
+  // Process a batch update when focus leaves an input
+  const handleInputBlur = useCallback(
+    (category: string) => {
+      const value = budgetValues[category] || 0;
+      handleBudgetChange(category, value);
+    },
+    [budgetValues, handleBudgetChange]
+  );
 
   return (
     <div className="bg-white shadow-md rounded p-6 mb-4">
@@ -173,7 +185,7 @@ const BudgetPlanner: React.FC = () => {
         <div className="flex flex-col space-y-2">
           <div className="flex items-center">
             <span className="mr-2">Gross Income:</span>
-            <p>{grossMonthlyIncome}</p>
+            <p>{formatCurrency(grossMonthlyIncome)}</p>
           </div>
           <div className="flex items-center text-sm text-gray-600">
             <span className="mr-2">Subscription Costs:</span>
@@ -213,39 +225,52 @@ const BudgetPlanner: React.FC = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {budgetItems.map((item, index) => (
-              <tr key={item.id}>
-                <td className="px-6 py-4 whitespace-nowrap">{item.category}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <input
-                      type="number"
-                      className="shadow border rounded py-1 px-2 text-gray-700 w-32"
-                      value={
-                        editMode === "amount" ? item.amount : item.percentage
-                      }
-                      onChange={(e) =>
-                        handleBudgetChange(
-                          index,
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                    />
-                    {editMode === "percentage" && (
-                      <span className="ml-1">%</span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {editMode === "amount"
-                    ? `${(monthlyIncome > 0
-                        ? (item.amount / monthlyIncome) * 100
-                        : 0
-                      ).toFixed(1)}%`
-                    : formatCurrency(item.amount)}
-                </td>
-              </tr>
-            ))}
+            {EXPENSE_CATEGORIES.map((category, index) => {
+              const value = budgetValues[category] || 0;
+              const percentage =
+                monthlyIncome > 0
+                  ? editMode === "amount"
+                    ? (value / monthlyIncome) * 100
+                    : value
+                  : 0;
+              const amount =
+                editMode === "amount"
+                  ? value
+                  : (percentage / 100) * monthlyIncome;
+
+              return (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap">{category}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        className="shadow border rounded py-1 px-2 text-gray-700 w-32"
+                        value={value}
+                        onChange={(e) => {
+                          const newValue = parseFloat(e.target.value) || 0;
+                          setBudgetValues((prev) => ({
+                            ...prev,
+                            [category]: newValue,
+                          }));
+                        }}
+                        onBlur={() => handleInputBlur(category)}
+                        step={editMode === "percentage" ? 0.1 : 100}
+                        min={0}
+                      />
+                      {editMode === "percentage" && (
+                        <span className="ml-1">%</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {editMode === "amount"
+                      ? `${percentage.toFixed(1)}%`
+                      : formatCurrency(amount)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot className="bg-gray-50">
             <tr className="font-medium">
@@ -284,17 +309,24 @@ const BudgetPlanner: React.FC = () => {
         {/* Progress Bar showing budget allocation */}
         <div className="h-8 w-full rounded-lg  bg-gray-200 mb-4 flex flex-row">
           {budgetItems
-            .sort((a, b) => b.percentage - a.percentage)
+            .filter((item) => item.amount > 0)
+            .sort((a, b) => b.amount - a.amount)
             .map((item, index) => {
+              // Calculate percentage of total income this budget represents
+              const percentage =
+                monthlyIncome > 0 ? (item.amount / monthlyIncome) * 100 : 0;
+
               return (
                 <div
-                  key={item.id}
-                  className="h-full float-left"
+                  key={item._id}
+                  className="h-full float-left relative"
                   style={{
-                    width: `${item.percentage}%`,
-                    marginLeft: index === 0 ? `0%` : `0`,
+                    width: `${percentage}%`,
                     backgroundColor: getColorForIndex(index),
                   }}
+                  title={`${item.category}: ${formatCurrency(
+                    item.amount
+                  )} (${percentage.toFixed(1)}%)`}
                 ></div>
               );
             })}
@@ -303,20 +335,23 @@ const BudgetPlanner: React.FC = () => {
         {/* Legend */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
           {budgetItems
-            .filter((item) => item.percentage > 0)
-            .sort((a, b) => b.percentage - a.percentage)
+            .filter((item) => item.amount > 0)
+            .sort((a, b) => b.amount - a.amount)
             .map((item, index) => (
-              <div key={item.id} className="flex items-center">
+              <div key={item._id} className="flex items-center">
                 <div
                   className="w-3 h-3 rounded-full mr-2"
                   style={{
-                    backgroundColor: getColorForIndex(
-                      budgetItems.findIndex((i) => i.id === item.id)
-                    ),
+                    backgroundColor: getColorForIndex(index),
                   }}
                 />
                 <span className="text-sm">
-                  {item.category}: {item.percentage.toFixed(1)}%
+                  {item.category}:{" "}
+                  {(monthlyIncome > 0
+                    ? (item.amount / monthlyIncome) * 100
+                    : 0
+                  ).toFixed(1)}
+                  %
                 </span>
               </div>
             ))}
@@ -409,7 +444,7 @@ const BudgetPlanner: React.FC = () => {
                 const difference = item.amount - actualSpending;
 
                 return (
-                  <tr key={`actual-${item.id}`}>
+                  <tr key={`actual-${item._id}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {item.category}
                     </td>

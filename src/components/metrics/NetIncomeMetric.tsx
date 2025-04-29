@@ -53,17 +53,14 @@ const NetIncomeMetric: React.FC<NetIncomeMetricProps> = ({
             </div>
             <div className="text-right">
               <span className="text-xs font-semibold inline-block text-red-600">
-                {`${formatCurrency(expenses)} Goal: ${formatCurrency(
-                  income / 2
-                )}`}
+                {formatCurrency(expenses)}
               </span>
             </div>
           </div>
           <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-red-200">
             <div
               style={{
-                width:
-                  income > 0 ? `${(expenses / (income / 2)) * 100}%` : "100%",
+                width: income > 0 ? `${(expenses / income) * 100}%` : "100%",
               }}
               className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-red-500"
             ></div>

@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import Asset from "../models/assetModel";
 import User, { IUser } from "../models/userModel";
 
 // Extend Express Request interface to include user property
@@ -19,9 +18,18 @@ const getAssets = asyncHandler(async (req: UserRequest, res: Response) => {
     throw new Error("Not authorized, no user found");
   }
 
-  const assets = await Asset.find({ user: req.user._id });
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
 
-  res.status(200).json(assets);
+  if (!user.assets) {
+    res.status(204).json([]);
+    return;
+  }
+
+  res.status(200).json(user?.assets);
 });
 
 /**
@@ -35,10 +43,16 @@ const getAssetById = asyncHandler(async (req: UserRequest, res: Response) => {
     throw new Error("Not authorized, no user found");
   }
 
-  const asset = await Asset.findOne({
-    _id: req.params.id,
-    user: req.user._id,
-  });
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  const asset = user.assets.find(
+    (asset) => asset?._id?.toString() === req.params.id
+  );
 
   if (asset) {
     res.status(200).json(asset);
@@ -67,30 +81,39 @@ const createAsset = asyncHandler(async (req: UserRequest, res: Response) => {
     throw new Error("Please provide all required fields");
   }
 
-  const asset = await Asset.create({
-    user: req.user._id,
+  const newAsset = {
     name,
     value,
     type,
     acquisitionDate,
     category,
-  });
+    values: [
+      {
+        date: new Date().toISOString(),
+        value,
+      },
+    ],
+    deposits: [
+      {
+        date: new Date().toISOString(),
+        amount: value,
+      },
+    ],
+  };
 
-  if (asset) {
-    const user = await User.findById(req.user._id);
+  // Find and update the user document directly
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $push: { assets: newAsset } },
+    { new: true }
+  ).populate("assets");
 
-    if (!user) {
-      res.status(404);
-      throw new Error("User not found");
-    }
-
-    user.assets.push(asset);
-    await user.save();
-
-    res.status(201).json(asset);
+  if (user) {
+    const addedAsset = user.assets[user.assets.length - 1];
+    res.status(201).json(addedAsset);
   } else {
-    res.status(400);
-    throw new Error("Invalid asset data");
+    res.status(404);
+    throw new Error("User not found");
   }
 });
 
@@ -105,10 +128,16 @@ const updateAsset = asyncHandler(async (req: UserRequest, res: Response) => {
     throw new Error("Not authorized, no user found");
   }
 
-  const asset = await Asset.findOne({
-    _id: req.params.id,
-    user: req.user._id,
-  });
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  const asset = user.assets.find(
+    (asset) => asset?._id?.toString() === req.params.id
+  );
 
   if (!asset) {
     res.status(404);
@@ -129,9 +158,11 @@ const updateAsset = asyncHandler(async (req: UserRequest, res: Response) => {
   if (category !== undefined) asset.category = category;
   if (growthRate !== undefined) asset.growthRate = growthRate;
 
-  const updatedAsset = await asset.save();
+  await asset.save();
 
-  res.status(200).json(updatedAsset);
+  const allAssets = await User.findById(req.user?._id).populate("assets");
+
+  res.status(200).json(allAssets?.assets);
 });
 
 /**
@@ -140,24 +171,47 @@ const updateAsset = asyncHandler(async (req: UserRequest, res: Response) => {
  * @access  Private
  */
 const deleteAsset = asyncHandler(async (req: UserRequest, res: Response) => {
-  if (!req.user) {
-    res.status(401);
-    throw new Error("Not authorized, no user found");
+  try {
+    if (!req.user) {
+      res.status(401);
+      throw new Error("Not authorized, no user found");
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      res.status(404);
+      throw new Error("User not found");
+    }
+
+    const asset = user.assets.find(
+      (asset) => asset?._id?.toString() === req.params.id
+    );
+
+    if (!asset) {
+      res.status(404);
+      throw new Error("Asset not found");
+    }
+
+    const result = await User.updateOne(
+      { _id: req.user._id },
+      { $pull: { assets: { _id: req.params.id } } }
+    );
+
+    if (result.modifiedCount === 0) {
+      res.status(404);
+      throw new Error("Asset not found or already deleted");
+    }
+
+    const updatedUser = await User.findById(req.user._id);
+    res.status(200).json(updatedUser?.assets);
+  } catch (error: any) {
+    console.warn("Error deleting asset", error);
+    res.status(400).json({
+      message: "Failed to delete asset",
+      error: error.message,
+    });
   }
-
-  const asset = await Asset.findOne({
-    _id: req.params.id,
-    user: req.user._id,
-  });
-
-  if (!asset) {
-    res.status(404);
-    throw new Error("Asset not found");
-  }
-
-  await asset.deleteOne();
-
-  res.status(200).json({ message: "Asset removed" });
 });
 
 /**
@@ -217,48 +271,56 @@ const addAssetDeposit = asyncHandler(
  */
 const updateAssetValue = asyncHandler(
   async (req: UserRequest, res: Response) => {
-    if (!req.user) {
-      res.status(401);
-      throw new Error("Not authorized, no user found");
+    try {
+      if (!req.user) {
+        res.status(401);
+        throw new Error("Not authorized, no user found");
+      }
+
+      const { value, date } = req.body;
+
+      if (value === undefined || !date) {
+        res.status(400);
+        throw new Error("Please provide value and date");
+      }
+
+      if (value < 0) {
+        res.status(400);
+        throw new Error("Value cannot be negative");
+      }
+
+      const result = await User.updateOne(
+        {
+          _id: req.user._id,
+          "assets._id": req.params.id,
+        },
+        {
+          $push: {
+            "assets.$.values": {
+              date,
+              value,
+            },
+          },
+          $set: {
+            "assets.$.value": value,
+          },
+        }
+      );
+
+      if (result.matchedCount === 0) {
+        res.status(404);
+        throw new Error("Asset not found");
+      }
+
+      const updatedUser = await User.findById(req.user._id).populate("assets");
+      res.status(200).json(updatedUser?.assets);
+    } catch (error: any) {
+      console.warn("Error updating asset value", error);
+      res.status(400).json({
+        message: "Failed to update asset value",
+        error: error.message,
+      });
     }
-
-    const user = await User.findById(req.user._id);
-
-    if (!user) {
-      res.status(404);
-      throw new Error("User not found");
-    }
-
-    const asset = user.assets.find(
-      (ast) => ast?._id?.toString() === req.params.id
-    );
-
-    if (!asset) {
-      res.status(404);
-      throw new Error("Asset not found");
-    }
-
-    const { value, date } = req.body;
-
-    if (value === undefined || !date) {
-      res.status(400);
-      throw new Error("Please provide value and date");
-    }
-
-    // Update asset's current value
-    asset.value = value;
-
-    // Add to value history array
-    if (!asset.values) asset.values = [];
-
-    asset.values.push({
-      date,
-      value,
-    });
-
-    await user.save();
-
-    res.status(200).json(asset);
   }
 );
 

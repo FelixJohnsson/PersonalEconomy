@@ -1,84 +1,50 @@
-import React, { useState } from "react";
-import { useAppContext } from "../context/AppContext";
+import React from "react";
 import LiabilityForm from "../components/LiabilityForm";
 import { formatCurrency } from "../utils/formatters";
 import Card from "../components/cards/Card";
+import { useLiabilities } from "../hooks/useLiabilities";
 
 const LiabilitiesPage: React.FC = () => {
-  const { liabilities, deleteLiability } = useAppContext();
-  const [selectedLiability, setSelectedLiability] = useState<string | null>(
-    null
-  );
+  const {
+    liabilities,
+    selectedLiability,
+    isLoading,
+    error,
+    totals,
+    setSelectedId,
+    deleteLiability,
+    getLiabilityTypeColor,
+    formatLiabilityType,
+    addLiability,
+    updateLiability,
+  } = useLiabilities();
 
-  // Sort liabilities by type and then by name
-  const sortedLiabilities = [...liabilities].sort((a, b) => {
-    // First sort by type
-    if (a.type !== b.type) {
-      const typeOrder = {
-        mortgage: 1,
-        loan: 2,
-        credit_card: 3,
-        other: 4,
-      };
-      return typeOrder[a.type] - typeOrder[b.type];
-    }
-    // Then sort by name
-    return a.name.localeCompare(b.name);
-  });
+  // Show loading indicator while data is being fetched
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading liabilities data...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Calculate total amounts
-  const totalLiabilityAmount = liabilities.reduce(
-    (sum, liability) => sum + liability.amount,
-    0
-  );
-  const totalMonthlyPayment = liabilities.reduce(
-    (sum, liability) => sum + liability.minimumPayment,
-    0
-  );
-  const averageInterestRate =
-    liabilities.length > 0
-      ? liabilities.reduce(
-          (sum, liability) => sum + liability.interestRate,
-          0
-        ) / liabilities.length
-      : 0;
-
-  const handleDelete = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this liability?")) {
-      deleteLiability(id);
-      if (selectedLiability === id) {
-        setSelectedLiability(null);
-      }
-    }
-  };
-
-  // Format liability type for display
-  const formatLiabilityType = (type: string): string => {
-    switch (type) {
-      case "credit_card":
-        return "Credit Card";
-      case "loan":
-        return "Loan";
-      case "mortgage":
-        return "Mortgage";
-      default:
-        return "Other";
-    }
-  };
-
-  // Get a color based on liability type
-  const getLiabilityTypeColor = (type: string): string => {
-    switch (type) {
-      case "mortgage":
-        return "#3B82F6"; // blue-500
-      case "loan":
-        return "#8B5CF6"; // purple-500
-      case "credit_card":
-        return "#EF4444"; // red-500
-      default:
-        return "#6B7280"; // gray-500
-    }
-  };
+  // Show error message if data fetching failed
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <p className="text-red-600 font-bold mb-2">
+            Error loading liabilities data
+          </p>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -88,7 +54,7 @@ const LiabilitiesPage: React.FC = () => {
         <Card variant="default" size="md">
           <h3 className="text-lg font-medium text-gray-700 mb-2">Total Debt</h3>
           <p className="text-2xl font-bold text-red-600">
-            {formatCurrency(totalLiabilityAmount)}
+            {formatCurrency(totals.totalLiabilityAmount)}
           </p>
         </Card>
 
@@ -97,7 +63,7 @@ const LiabilitiesPage: React.FC = () => {
             Monthly Payments
           </h3>
           <p className="text-2xl font-bold text-gray-900">
-            {formatCurrency(totalMonthlyPayment)}
+            {formatCurrency(totals.totalMonthlyPayment)}
           </p>
         </Card>
 
@@ -106,7 +72,7 @@ const LiabilitiesPage: React.FC = () => {
             Avg. Interest Rate
           </h3>
           <p className="text-2xl font-bold text-gray-900">
-            {averageInterestRate.toFixed(2)}%
+            {totals.averageInterestRate.toFixed(2)}%
           </p>
         </Card>
       </div>
@@ -144,8 +110,8 @@ const LiabilitiesPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {sortedLiabilities.map((liability) => (
-                      <tr key={liability.id}>
+                    {liabilities.map((liability) => (
+                      <tr key={liability._id}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
                             {liability.name}
@@ -175,13 +141,13 @@ const LiabilitiesPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            onClick={() => setSelectedLiability(liability.id)}
+                            onClick={() => setSelectedId(liability._id)}
                             className="text-blue-600 hover:text-blue-900 mr-4"
                           >
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDelete(liability.id)}
+                            onClick={() => deleteLiability(liability)}
                             className="text-red-600 hover:text-red-900"
                           >
                             Delete
@@ -198,12 +164,10 @@ const LiabilitiesPage: React.FC = () => {
 
         <div>
           <LiabilityForm
-            initialLiability={
-              selectedLiability
-                ? liabilities.find((l) => l.id === selectedLiability)
-                : undefined
-            }
-            onSubmit={() => setSelectedLiability(null)}
+            initialLiability={selectedLiability}
+            onSubmit={() => setSelectedId(null)}
+            addLiability={addLiability}
+            updateLiability={updateLiability}
           />
 
           <Card variant="default" size="lg" className="mt-6">

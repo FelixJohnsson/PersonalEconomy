@@ -287,7 +287,7 @@ const SavingsProjection: React.FC<{ goal: SavingsGoal }> = ({ goal }) => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {linkedAssets.map((asset) => (
-                  <tr key={asset.id}>
+                  <tr key={asset._id}>
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                       {asset.name}
                     </td>

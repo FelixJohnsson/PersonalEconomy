@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useAppContext } from "../context/AppContext";
 import MetricCard from "../components/metrics/MetricCard";
 import NetIncomeMetric from "../components/metrics/NetIncomeMetric";
 import { formatCurrency, formatPercentage } from "../utils/formatters";
@@ -8,15 +7,21 @@ import DateRangeSelector from "../components/forms/DateRangeSelector";
 import InfoCard from "../components/ui/InfoCard";
 import NetWorthMiniChart from "../components/charts/NetWorthMiniChart";
 import { NetWorthHistoryService } from "../services/NetWorthHistory";
+import { useSubscriptions } from "../hooks/useSubscriptions";
+import { useAssets } from "../hooks/useAssets";
+import { useLiabilities } from "../hooks/useLiabilities";
+import { useIncome } from "../hooks/useIncome";
+import { useExpenses } from "../hooks/useExpenses";
+import { useBudget } from "../hooks/useBudget";
 
 const Dashboard: React.FC = () => {
-  const {
-    getFinancialSummary,
-    getActiveSubscriptions,
-    getBudgetItems,
-    assets,
-    liabilities,
-  } = useAppContext();
+  const { liabilities } = useLiabilities();
+  const { budgets: budgetItems } = useBudget();
+  const { totals } = useIncome();
+  const { assets } = useAssets();
+  const { totalExpenses } = useExpenses();
+  const { sortedSubscriptions, subscriptions } = useSubscriptions();
+
   const [customPeriod, setCustomPeriod] = useState<Record<string, string>>(
     () => {
       const today = new Date();
@@ -45,7 +50,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     // Calculate net worth history from asset historical values
-    const history = NetWorthHistoryService.getOrGenerateHistory(
+    const history = NetWorthHistoryService.getNetWorthHistory(
       assets,
       liabilities
     );
@@ -59,11 +64,6 @@ const Dashboard: React.FC = () => {
     );
   }, [assets, liabilities]);
 
-  // Get financial summary with custom period
-  const summary = getFinancialSummary(customPeriod);
-  const activeSubscriptions = getActiveSubscriptions();
-  const budgetItems = getBudgetItems();
-
   // Handle date changes
   const handleDateChange = (
     dateType: "startDate" | "endDate",
@@ -76,8 +76,8 @@ const Dashboard: React.FC = () => {
   };
 
   // Calculate subscriptions total
-  const subscriptionTotal = activeSubscriptions.reduce((total, sub) => {
-    if (sub.frequency === "monthly") {
+  const subscriptionTotal = sortedSubscriptions.reduce((total, sub) => {
+    if (sub.frequency === "monthly" && sub.category !== "Housing") {
       return total + sub.amount;
     } else {
       return total + sub.amount / 12;
@@ -86,7 +86,7 @@ const Dashboard: React.FC = () => {
 
   // Get housing cost from budget
   const housingBudget =
-    budgetItems.find((item) => item.category === "Housing")?.amount || 0;
+    subscriptions.find((item) => item.category === "Housing")?.amount || 0;
 
   // Calculate fixed costs total (subscriptions + housing)
   const fixedCostsTotal = subscriptionTotal + housingBudget;
@@ -96,7 +96,7 @@ const Dashboard: React.FC = () => {
   const thirtyDaysFromNow = new Date();
   thirtyDaysFromNow.setDate(today.getDate() + 30);
 
-  const upcomingSubscriptions = activeSubscriptions
+  const upcomingSubscriptions = sortedSubscriptions
     .filter((sub) => {
       const billingDay = new Date(sub.billingDate).getDate();
 
@@ -145,21 +145,36 @@ const Dashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <NetIncomeMetric
-            income={summary.totalIncome}
-            expenses={summary.totalExpenses}
+            income={totals.totalNetIncome}
+            expenses={totalExpenses}
             subscriptionsTotalCost={subscriptionTotal}
           />
 
           <MetricCard
             title="Savings Rate"
-            value={formatPercentage(summary.savingsRate)}
+            value={formatPercentage(totals.totalNetIncome / totalExpenses)}
           />
 
           <Link to="/net-worth" className="block">
             <MetricCard
               title="Net Worth"
-              value={formatCurrency(summary.netWorth)}
-              trend={summary.netWorth > 0 ? "up" : "down"}
+              value={formatCurrency(
+                assets.reduce((sum, asset) => sum + asset.value, 0) -
+                  liabilities.reduce(
+                    (sum, liability) => sum + liability.amount,
+                    0
+                  )
+              )}
+              trend={
+                assets.reduce((sum, asset) => sum + asset.value, 0) -
+                  liabilities.reduce(
+                    (sum, liability) => sum + liability.amount,
+                    0
+                  ) >
+                0
+                  ? "up"
+                  : "down"
+              }
               footer={
                 <>
                   {netWorthHistory.length > 0 && (
@@ -168,9 +183,20 @@ const Dashboard: React.FC = () => {
                     </div>
                   )}
                   <div className="flex justify-between text-xs">
-                    <span>Assets: {formatCurrency(summary.totalAssets)}</span>
                     <span>
-                      Liabilities: {formatCurrency(summary.totalLiabilities)}
+                      Assets:{" "}
+                      {formatCurrency(
+                        assets.reduce((sum, asset) => sum + asset.value, 0)
+                      )}
+                    </span>
+                    <span>
+                      Liabilities:{" "}
+                      {formatCurrency(
+                        liabilities.reduce(
+                          (sum, liability) => sum + liability.amount,
+                          0
+                        )
+                      )}
                     </span>
                   </div>
                 </>
@@ -256,23 +282,25 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="font-medium">Period Income</span>
               <span className="text-green-600 font-semibold">
-                {formatCurrency(summary.totalIncome)}
+                {formatCurrency(totals.totalNetIncome)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-medium">Period Expenses</span>
               <span className="text-red-600 font-semibold">
-                {formatCurrency(summary.totalExpenses)}
+                {formatCurrency(totalExpenses)}
               </span>
             </div>
             <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
               <span className="font-semibold">Net Income</span>
               <span
                 className={`font-semibold ${
-                  summary.netIncome >= 0 ? "text-green-600" : "text-red-600"
+                  totals.totalNetIncome - totalExpenses >= 0
+                    ? "text-green-600"
+                    : "text-red-600"
                 }`}
               >
-                {`${formatCurrency(summary.netIncome)}`}
+                {`${formatCurrency(totals.totalNetIncome - totalExpenses)}`}
               </span>
             </div>
           </div>
@@ -318,8 +346,8 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="flex justify-between items-center text-xs text-gray-500">
               <span>
-                {((fixedCostsTotal / summary.totalIncome) * 100).toFixed(1)}% of
-                income
+                {((fixedCostsTotal / totals.totalNetIncome) * 100).toFixed(1)}%
+                of income
               </span>
             </div>
           </div>
@@ -348,23 +376,43 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="font-medium">Total Assets</span>
               <span className="text-green-600 font-semibold">
-                {formatCurrency(summary.totalAssets)}
+                {formatCurrency(
+                  assets.reduce((sum, asset) => sum + asset.value, 0)
+                )}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-medium">Total Liabilities</span>
               <span className="text-red-600 font-semibold">
-                {formatCurrency(summary.totalLiabilities)}
+                {formatCurrency(
+                  liabilities.reduce(
+                    (sum, liability) => sum + liability.amount,
+                    0
+                  )
+                )}
               </span>
             </div>
             <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
               <span className="font-semibold">Net Worth</span>
               <span
                 className={`font-semibold ${
-                  summary.netWorth >= 0 ? "text-green-600" : "text-red-600"
+                  assets.reduce((sum, asset) => sum + asset.value, 0) -
+                    liabilities.reduce(
+                      (sum, liability) => sum + liability.amount,
+                      0
+                    ) >=
+                  0
+                    ? "text-green-600"
+                    : "text-red-600"
                 }`}
               >
-                {formatCurrency(summary.netWorth)}
+                {formatCurrency(
+                  assets.reduce((sum, asset) => sum + asset.value, 0) -
+                    liabilities.reduce(
+                      (sum, liability) => sum + liability.amount,
+                      0
+                    )
+                )}
               </span>
             </div>
           </div>
@@ -381,7 +429,7 @@ const Dashboard: React.FC = () => {
             </Link>
           }
         >
-          {activeSubscriptions.length === 0 ? (
+          {sortedSubscriptions.length === 0 ? (
             <div className="text-center py-4">
               <p className="text-gray-500 mb-2">No active subscriptions</p>
               <Link

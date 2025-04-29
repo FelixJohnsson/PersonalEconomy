@@ -1,40 +1,58 @@
 import React, { useState } from "react";
-import { Note } from "../types/Note";
 import NoteCard from "../components/notes/NoteCard";
 import NoteEditor from "../components/notes/NoteEditor";
-import { useAppContext } from "../context/AppContext";
+import { useNotes } from "../hooks/useNotes";
+import { NoteFormData } from "../types";
 
 const Notes: React.FC = () => {
-  const { notes, addNote, updateNote, deleteNote, toggleNotePin } =
-    useAppContext();
-  const [editingNote, setEditingNote] = useState<Note | undefined>();
+  const {
+    sortedNotes,
+    isLoading,
+    error,
+    addNote,
+    updateNote,
+    deleteNote,
+    toggleNotePin,
+  } = useNotes();
   const [isCreating, setIsCreating] = useState(false);
 
-  const handleSave = (
-    noteData: Omit<Note, "id" | "createdAt" | "updatedAt">
-  ) => {
-    if (editingNote) {
-      updateNote({ ...editingNote, ...noteData });
-      setEditingNote(undefined);
-    } else {
-      addNote(noteData);
+  // Show loading indicator while data is being fetched
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-10">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading notes...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error message if data fetching failed
+  if (error) {
+    return (
+      <div className="space-y-6 pb-10">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-red-500 text-5xl mb-4">⚠️</div>
+            <p className="text-red-600 font-bold mb-2">Error loading notes</p>
+            <p className="text-gray-600">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSave = async (noteData: NoteFormData) => {
+    try {
+      await addNote(noteData);
+      setIsCreating(false);
+    } catch (err) {
+      console.error("Failed to save note:", err);
     }
-    setIsCreating(false);
   };
-
-  const handleDelete = (noteId: string) => {
-    deleteNote(noteId);
-  };
-
-  const handleTogglePin = (noteId: string) => {
-    toggleNotePin(noteId);
-  };
-
-  const sortedNotes = [...notes].sort((a, b) => {
-    if (a.isPinned && !b.isPinned) return -1;
-    if (!a.isPinned && b.isPinned) return 1;
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-  });
 
   return (
     <div className="space-y-6 pb-10">
@@ -53,15 +71,11 @@ const Notes: React.FC = () => {
         </p>
       </section>
 
-      {(isCreating || editingNote) && (
+      {isCreating && (
         <div className="bg-white rounded-lg shadow-md p-6">
           <NoteEditor
-            note={editingNote}
             onSave={handleSave}
-            onCancel={() => {
-              setEditingNote(undefined);
-              setIsCreating(false);
-            }}
+            onCancel={() => setIsCreating(false)}
           />
         </div>
       )}
@@ -69,16 +83,18 @@ const Notes: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {sortedNotes.map((note) => (
           <NoteCard
-            key={note.id}
+            key={note._id}
             note={note}
-            onEdit={setEditingNote}
-            onDelete={handleDelete}
-            onTogglePin={handleTogglePin}
+            onEdit={(note) => {
+              updateNote(note);
+            }}
+            onDelete={deleteNote}
+            onTogglePin={toggleNotePin}
           />
         ))}
       </div>
 
-      {notes.length === 0 && !isCreating && (
+      {sortedNotes.length === 0 && !isCreating && (
         <div className="text-center py-12">
           <p className="text-gray-500 mb-4">
             No notes yet. Create your first note to get started!

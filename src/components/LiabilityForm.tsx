@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { useAppContext } from "../context/AppContext";
-import { Liability } from "../types";
+import { Liability, LiabilityFormData, LiabilityType } from "../types";
 import Card from "./cards/Card";
 import Button from "./buttons/Button";
 
 interface LiabilityFormProps {
   initialLiability?: Liability;
   onSubmit?: () => void;
+  addLiability: (liability: LiabilityFormData) => void;
+  updateLiability: (liability: Liability) => void;
 }
 
 const LiabilityForm: React.FC<LiabilityFormProps> = ({
   initialLiability,
   onSubmit,
+  addLiability,
+  updateLiability,
 }) => {
-  const { addLiability, updateLiability } = useAppContext();
-
   const [name, setName] = useState(initialLiability?.name || "");
   const [amount, setAmount] = useState(initialLiability?.amount || 0);
   const [interestRate, setInterestRate] = useState(
@@ -40,7 +41,7 @@ const LiabilityForm: React.FC<LiabilityFormProps> = ({
     }
   }, [initialLiability]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -53,31 +54,43 @@ const LiabilityForm: React.FC<LiabilityFormProps> = ({
       return;
     }
 
-    const liabilityData: Omit<Liability, "id"> = {
+    const liabilityData: LiabilityFormData = {
       name,
       amount,
       interestRate,
       minimumPayment,
-      type,
+      type: type as LiabilityType,
     };
 
-    if (initialLiability) {
-      updateLiability({ ...liabilityData, id: initialLiability.id });
-    } else {
-      addLiability(liabilityData);
-    }
+    try {
+      if (initialLiability) {
+        await updateLiability({
+          ...liabilityData,
+          _id: initialLiability._id,
+          user: initialLiability.user,
+          createdAt: initialLiability.createdAt,
+          updatedAt: initialLiability.updatedAt,
+        });
+      } else {
+        await addLiability({
+          ...liabilityData,
+        });
+      }
 
-    // Reset form
-    if (!initialLiability) {
-      setName("");
-      setAmount(0);
-      setInterestRate(0);
-      setMinimumPayment(0);
-      setType("other");
-    }
+      // Reset form
+      if (!initialLiability) {
+        setName("");
+        setAmount(0);
+        setInterestRate(0);
+        setMinimumPayment(0);
+        setType("other");
+      }
 
-    setError("");
-    if (onSubmit) onSubmit();
+      setError("");
+      if (onSubmit) onSubmit();
+    } catch (err) {
+      setError("Failed to save liability. Please try again.");
+    }
   };
 
   return (

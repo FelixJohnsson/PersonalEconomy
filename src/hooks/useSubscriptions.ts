@@ -104,8 +104,11 @@ export const useSubscriptions = () => {
 
     try {
       setIsLoading(true);
-      await apiRequest(`/api/user-data/subscriptions/${id}`, "DELETE");
-      setSubscriptions(subscriptions.filter((s) => s._id !== id));
+      const res = await apiRequest(
+        `/api/user-data/subscriptions/${id}`,
+        "DELETE"
+      );
+      setSubscriptions(res.subscriptions);
     } catch (err) {
       console.error("Error deleting subscription:", err);
       setError("Failed to delete subscription");

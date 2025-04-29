@@ -94,8 +94,8 @@ export const useAssets = () => {
 
     try {
       setIsLoading(true);
-      await apiRequest(`/api/user-data/assets/${id}`, "DELETE");
-      setAssets(assets.filter((asset) => asset._id !== id));
+      const assets = await apiRequest(`/api/user-data/assets/${id}`, "DELETE");
+      setAssets(assets);
     } catch (err) {
       console.error("Error deleting asset:", err);
       setError("Failed to delete asset");

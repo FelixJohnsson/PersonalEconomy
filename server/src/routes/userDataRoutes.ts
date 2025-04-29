@@ -34,6 +34,7 @@ import {
   createExpense,
   updateExpense,
   deleteExpense,
+  importExpensesToUser,
 } from "../controllers/expenseController";
 
 import {
@@ -43,6 +44,24 @@ import {
   updateLiability,
   deleteLiability,
 } from "../controllers/liabilityController";
+
+import {
+  getNotes,
+  getNote,
+  createNote,
+  updateNote,
+  deleteNote,
+  toggleNotePin,
+} from "../controllers/notesController";
+
+import {
+  getBudgets,
+  getBudgetById,
+  createBudget,
+  updateBudget,
+  deleteBudget,
+  trackBudgetSpending,
+} from "../controllers/budgetController";
 
 const router = express.Router();
 
@@ -67,6 +86,7 @@ router
   .put(updateExpense)
   .delete(deleteExpense)
   .get(getExpenseById);
+router.route("/expenses/import").post(importExpensesToUser);
 
 // Asset routes
 router.route("/assets").post(createAsset).get(getAssets);
@@ -93,5 +113,19 @@ router
   .get(getSubscriptionById)
   .put(updateSubscription)
   .delete(deleteSubscription);
+
+// Note routes
+router.route("/notes").post(createNote).get(getNotes);
+router.route("/notes/:id").get(getNote).put(updateNote).delete(deleteNote);
+router.route("/notes/:id/pin").put(toggleNotePin);
+
+// Budget routes
+router.route("/budgets").post(createBudget).get(getBudgets);
+router
+  .route("/budgets/:id")
+  .get(getBudgetById)
+  .put(updateBudget)
+  .delete(deleteBudget);
+router.route("/budgets/:id/track").post(trackBudgetSpending);
 
 export default router;

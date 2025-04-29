@@ -1,11 +1,13 @@
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
+import * as bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { subscriptionSchema, ISubscription } from "./subscriptionModel";
 import Income, { IIncome } from "./incomeModel";
 import Expense, { IExpense } from "./expenseModel";
 import Asset, { IAsset } from "./assetModel";
 import Liability, { ILiability } from "./liabilityModel";
+import Budget, { IBudget } from "./budgetModel";
+import { noteSchema, INote } from "./noteModel";
 
 export enum Frequency {
   MONTHLY = "monthly",
@@ -27,6 +29,8 @@ export interface IUser extends mongoose.Document {
   assets: IAsset[];
   liabilities: ILiability[];
   subscriptions: ISubscription[];
+  budgets: IBudget[];
+  notes: INote[];
   createdAt: Date;
   updatedAt: Date;
   matchPassword(enteredPassword: string): Promise<boolean>;
@@ -38,6 +42,7 @@ const incomeSchema = (Income as any).schema;
 const expenseSchema = (Expense as any).schema;
 const assetSchema = (Asset as any).schema;
 const liabilitySchema = (Liability as any).schema;
+const budgetSchema = (Budget as any).schema;
 
 const userSchema = new mongoose.Schema<IUser>(
   {
@@ -71,6 +76,8 @@ const userSchema = new mongoose.Schema<IUser>(
     assets: [assetSchema],
     liabilities: [liabilitySchema],
     subscriptions: [subscriptionSchema],
+    budgets: [budgetSchema],
+    notes: [noteSchema],
   },
   {
     timestamps: true,
@@ -102,7 +109,15 @@ userSchema.methods.getSignedJwtToken = function (): string {
 userSchema.methods.matchPassword = async function (
   enteredPassword: string
 ): Promise<boolean> {
-  return await bcrypt.compare(enteredPassword, this.password);
+  if (!this.password) {
+    return false;
+  }
+  try {
+    return await bcrypt.compare(enteredPassword, this.password);
+  } catch (error) {
+    console.error("Error comparing passwords:", error);
+    return false;
+  }
 };
 
 const User = mongoose.model<IUser>("User", userSchema);

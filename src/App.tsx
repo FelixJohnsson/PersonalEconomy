@@ -12,15 +12,14 @@ import IncomePage from "./pages/IncomePage";
 import SubscriptionsPage from "./pages/SubscriptionsPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import Budget from "./pages/Budget";
-import Notes from "./pages/Notes";
 import TaxReturnPage from "./pages/TaxReturnPage";
 import SettingsPage from "./pages/SettingsPage";
-import SetupPage from "./pages/SetupPage";
 import NetWorthPage from "./pages/NetWorthPage";
 import LiabilitiesPage from "./pages/LiabilitiesPage";
 import WhatIfCalculatorPage from "./pages/WhatIfCalculatorPage";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
+import NotesPage from "./pages/NotesPage";
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -116,14 +115,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </li>
             <li>
               <Link
-                to="/categories"
-                className="block py-2 px-4 rounded hover:bg-gray-700 transition-colors"
-              >
-                Categories
-              </Link>
-            </li>
-            <li>
-              <Link
                 to="/future-tracker"
                 className="block py-2 px-4 rounded hover:bg-gray-700 transition-colors"
               >
@@ -205,20 +196,6 @@ const AppRouter: React.FC = () => {
         element={!isAuthenticated ? <AuthPage /> : <Navigate to="/" />}
       />
 
-      {/* Setup route - for authenticated users who haven't completed setup */}
-      <Route
-        path="/setup"
-        element={
-          isAuthenticated && !user?.isSetupComplete ? (
-            <SetupPage />
-          ) : isAuthenticated ? (
-            <Navigate to="/" />
-          ) : (
-            <Navigate to="/auth" />
-          )
-        }
-      />
-
       {/* Protected routes that require authentication */}
       <Route element={<ProtectedRoute />}>
         {/* If user is authenticated but hasn't completed setup, redirect to setup */}
@@ -293,7 +270,7 @@ const AppRouter: React.FC = () => {
           path="/future-tracker"
           element={
             <Layout>
-              <SettingsPage />
+              <FutureTrackerPage />
             </Layout>
           }
         />
@@ -302,7 +279,7 @@ const AppRouter: React.FC = () => {
           path="/budget"
           element={
             <Layout>
-              <SettingsPage />
+              <Budget />
             </Layout>
           }
         />
@@ -311,7 +288,7 @@ const AppRouter: React.FC = () => {
           path="/notes"
           element={
             <Layout>
-              <SettingsPage />
+              <NotesPage />
             </Layout>
           }
         />
@@ -320,7 +297,7 @@ const AppRouter: React.FC = () => {
           path="/tax-returns"
           element={
             <Layout>
-              <SettingsPage />
+              <TaxReturnPage />
             </Layout>
           }
         />
@@ -329,7 +306,7 @@ const AppRouter: React.FC = () => {
           path="/liabilities"
           element={
             <Layout>
-              <SettingsPage />
+              <LiabilitiesPage />
             </Layout>
           }
         />
@@ -338,7 +315,7 @@ const AppRouter: React.FC = () => {
           path="/net-worth"
           element={
             <Layout>
-              <SettingsPage />
+              <NetWorthPage />
             </Layout>
           }
         />
@@ -347,7 +324,7 @@ const AppRouter: React.FC = () => {
           path="/what-if"
           element={
             <Layout>
-              <SettingsPage />
+              <WhatIfCalculatorPage />
             </Layout>
           }
         />

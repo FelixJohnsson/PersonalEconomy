@@ -2,9 +2,11 @@ import React, { useState, useMemo } from "react";
 import { useAppContext } from "../context/AppContext";
 import { formatCurrency } from "../utils/formatters";
 import { Frequency } from "../types";
+import { useSubscriptions } from "../hooks/useSubscriptions";
+
 const CategoriesPage: React.FC = () => {
-  const { expenses, incomes, subscriptions, getActiveSubscriptions } =
-    useAppContext();
+  const { expenses, incomes } = useAppContext();
+  const { subscriptions } = useSubscriptions();
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -88,7 +90,7 @@ const CategoriesPage: React.FC = () => {
     });
 
     // Add subscription data (only active subscriptions)
-    getActiveSubscriptions().forEach((subscription) => {
+    subscriptions.forEach((subscription) => {
       if (!subscription.category || !data[subscription.category]) return;
 
       data[subscription.category].subscriptionCount++;
@@ -107,7 +109,7 @@ const CategoriesPage: React.FC = () => {
     });
 
     return data;
-  }, [expenses, incomes, subscriptions, getActiveSubscriptions]);
+  }, [expenses, incomes, subscriptions]);
 
   // Get actual categories that have data
   const validCategories = useMemo(() => {
@@ -308,11 +310,13 @@ const CategoriesPage: React.FC = () => {
                   <h3 className="text-md font-medium mb-2">Expenses</h3>
                   <ul className="text-sm space-y-1">
                     {categoryExpenses.map((expense) => (
-                      <li key={expense.id} className="flex justify-between">
+                      <li key={expense._id} className="flex justify-between">
                         <span>{expense.name}</span>
                         <span>
                           {formatCurrency(expense.amount)}
-                          {expense.frequency === "annual" ? "/year" : "/month"}
+                          {expense.frequency === Frequency.YEARLY
+                            ? "/year"
+                            : "/month"}
                         </span>
                       </li>
                     ))}

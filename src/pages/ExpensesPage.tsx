@@ -3,6 +3,7 @@ import ExpenseForm from "../components/ExpenseForm";
 import ExpenseSummary from "../components/ExpenseSummary";
 import { formatCurrency } from "../utils/formatters";
 import { useExpenses } from "../hooks/useExpenses";
+import Button from "../components/buttons/Button";
 
 const ExpensesPage: React.FC = () => {
   const {
@@ -27,6 +28,7 @@ const ExpensesPage: React.FC = () => {
     getCategoryColor,
     getNecessityLevelColor,
     formatExpenseDate,
+    importExpensesToUser,
   } = useExpenses();
 
   // Show loading indicator while data is being fetched
@@ -65,6 +67,8 @@ const ExpensesPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Expenses</h1>
+
+      <Button onClick={() => importExpensesToUser()}>Import Expenses</Button>
 
       <div className="grid grid-cols-1 gap-6 mb-6">
         <ExpenseSummary />

@@ -56,37 +56,45 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
  * @access  Public
  */
 const loginUser = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
+    console.warn("Login user", email, password);
 
-  // Check if email and password are provided
-  if (!email || !password) {
-    res.status(400);
-    throw new Error("Please provide email and password");
-  }
+    // Check if email and password are provided
+    if (!email || !password) {
+      res.status(400);
+      throw new Error("Please provide email and password");
+    }
 
-  // Check for user
-  const user = await User.findOne({ email }).select("+password");
+    // Check for user
+    const user = await User.findOne({ email }).select("+password");
 
-  if (!user) {
+    if (!user) {
+      res.status(401);
+      throw new Error("Invalid credentials");
+    }
+
+    // Check if password matches
+    const isMatch = await user.matchPassword(password);
+    console.warn("Is match", isMatch, user);
+
+    if (!isMatch) {
+      res.status(401);
+      throw new Error("Invalid credentials");
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      isSetupComplete: user.isSetupComplete,
+      token: user.getSignedJwtToken(),
+    });
+  } catch (error: any) {
     res.status(401);
-    throw new Error("Invalid credentials");
+    console.warn("Error", error);
+    throw new Error(error.message);
   }
-
-  // Check if password matches
-  const isMatch = await user.matchPassword(password);
-
-  if (!isMatch) {
-    res.status(401);
-    throw new Error("Invalid credentials");
-  }
-
-  res.json({
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    isSetupComplete: user.isSetupComplete,
-    token: user.getSignedJwtToken(),
-  });
 });
 
 /**

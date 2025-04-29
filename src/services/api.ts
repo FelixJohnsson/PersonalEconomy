@@ -2,7 +2,7 @@
  * API Service
  * This service handles all API requests to the backend
  */
-import { Income, Asset, IncomeFormData } from "../types";
+import { Income, Asset, IncomeFormData, Liability } from "../types";
 
 // API base URL - make sure it doesn't end with /api
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5003";
@@ -100,6 +100,18 @@ export interface AssetDepositPayload {
   notes?: string;
 }
 
+export interface BudgetPayload {
+  name: string;
+  amount: number;
+  category: string;
+}
+
+export interface BudgetTrackingPayload {
+  date: string;
+  amount: number;
+  description?: string;
+}
+
 /**
  * User API Services
  */
@@ -163,13 +175,13 @@ export const assetApi = {
  */
 export const liabilityApi = {
   getLiabilities: () =>
-    apiRequest("/api/user-data", "GET").then((data) => data.liabilities),
-  createLiability: (liabilityData: LiabilityPayload) =>
+    apiRequest("/api/user-data/liabilities", "GET").then((data) => data),
+  createLiability: (liabilityData: LiabilityPayload): Promise<Liability[]> =>
     apiRequest("/api/user-data/liabilities", "POST", liabilityData),
   updateLiability: (id: string, liabilityData: Partial<LiabilityPayload>) =>
     apiRequest(`/api/user-data/liabilities/${id}`, "PUT", liabilityData),
-  deleteLiability: (id: string) =>
-    apiRequest(`/api/user-data/liabilities/${id}`, "DELETE"),
+  deleteLiability: (liability: Liability) =>
+    apiRequest(`/api/user-data/liabilities/${liability._id}`, "DELETE"),
 };
 
 /**
@@ -179,11 +191,11 @@ export const savingsGoalApi = {
   getSavingsGoals: () => apiRequest("/savings-goals"),
   getSavingsGoal: (id: string) => apiRequest(`/savings-goals/${id}`),
   createSavingsGoal: (goalData: any) =>
-    apiRequest("/savings-goals", "POST", goalData),
+    apiRequest("/api/user-data/savings-goals", "POST", goalData),
   updateSavingsGoal: (id: string, goalData: any) =>
-    apiRequest(`/savings-goals/${id}`, "PUT", goalData),
+    apiRequest(`/api/user-data/savings-goals/${id}`, "PUT", goalData),
   deleteSavingsGoal: (id: string) =>
-    apiRequest(`/savings-goals/${id}`, "DELETE"),
+    apiRequest(`/api/user-data/savings-goals/${id}`, "DELETE"),
 };
 
 /**
@@ -193,44 +205,55 @@ export const subscriptionApi = {
   getSubscriptions: () => apiRequest("/subscriptions"),
   getSubscription: (id: string) => apiRequest(`/subscriptions/${id}`),
   createSubscription: (subscriptionData: any) =>
-    apiRequest("/subscriptions", "POST", subscriptionData),
+    apiRequest("/api/user-data/subscriptions", "POST", subscriptionData),
   updateSubscription: (id: string, subscriptionData: any) =>
-    apiRequest(`/subscriptions/${id}`, "PUT", subscriptionData),
+    apiRequest(`/api/user-data/subscriptions/${id}`, "PUT", subscriptionData),
   deleteSubscription: (id: string) =>
-    apiRequest(`/subscriptions/${id}`, "DELETE"),
+    apiRequest(`/api/user-data/subscriptions/${id}`, "DELETE"),
 };
 
 /**
  * Budget API Services
  */
 export const budgetApi = {
-  getBudgetItems: () => apiRequest("/budget"),
-  updateBudgetItems: (budgetData: any) =>
-    apiRequest("/budget", "PUT", budgetData),
+  getBudgets: () => apiRequest("/api/user-data/budgets"),
+  getBudget: (id: string) => apiRequest(`/api/user-data/budgets/${id}`),
+  createBudget: (budgetData: BudgetPayload) =>
+    apiRequest("/api/user-data/budgets", "POST", budgetData),
+  updateBudget: (id: string, budgetData: Partial<BudgetPayload>) =>
+    apiRequest(`/api/user-data/budgets/${id}`, "PUT", budgetData),
+  deleteBudget: (id: string) =>
+    apiRequest(`/api/user-data/budgets/${id}`, "DELETE"),
+  trackSpending: (id: string, trackingData: BudgetTrackingPayload) =>
+    apiRequest(`/api/user-data/budgets/${id}/track`, "POST", trackingData),
 };
 
 /**
  * Note API Services
  */
 export const noteApi = {
-  getNotes: () => apiRequest("/notes"),
-  getNote: (id: string) => apiRequest(`/notes/${id}`),
-  createNote: (noteData: any) => apiRequest("/notes", "POST", noteData),
+  getNotes: () => apiRequest("/api/user-data/notes"),
+  getNote: (id: string) => apiRequest(`/api/user-data/notes/${id}`),
+  createNote: (noteData: any) =>
+    apiRequest("/api/user-data/notes", "POST", noteData),
   updateNote: (id: string, noteData: any) =>
-    apiRequest(`/notes/${id}`, "PUT", noteData),
-  deleteNote: (id: string) => apiRequest(`/notes/${id}`, "DELETE"),
-  toggleNotePin: (id: string) => apiRequest(`/notes/${id}/pin`, "PUT"),
+    apiRequest(`/api/user-data/notes/${id}`, "PUT", noteData),
+  deleteNote: (id: string) =>
+    apiRequest(`/api/user-data/notes/${id}`, "DELETE"),
+  toggleNotePin: (id: string) =>
+    apiRequest(`/api/user-data/notes/${id}/pin`, "PUT"),
 };
 
 /**
  * Tax Return API Services
  */
 export const taxReturnApi = {
-  getTaxReturns: () => apiRequest("/tax-returns"),
-  getTaxReturn: (id: string) => apiRequest(`/tax-returns/${id}`),
+  getTaxReturns: () => apiRequest("/api/user-data/tax-returns"),
+  getTaxReturn: (id: string) => apiRequest(`/api/user-data/tax-returns/${id}`),
   createTaxReturn: (taxReturnData: any) =>
-    apiRequest("/tax-returns", "POST", taxReturnData),
+    apiRequest("/api/user-data/tax-returns", "POST", taxReturnData),
   updateTaxReturn: (id: string, taxReturnData: any) =>
-    apiRequest(`/tax-returns/${id}`, "PUT", taxReturnData),
-  deleteTaxReturn: (id: string) => apiRequest(`/tax-returns/${id}`, "DELETE"),
+    apiRequest(`/api/user-data/tax-returns/${id}`, "PUT", taxReturnData),
+  deleteTaxReturn: (id: string) =>
+    apiRequest(`/api/user-data/tax-returns/${id}`, "DELETE"),
 };

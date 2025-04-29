@@ -31,7 +31,6 @@ const AssetsPage: React.FC = () => {
     updateAsset,
     updateAssetValue,
     addAssetDeposit,
-    getTypeColor,
     getValueChange,
     addAsset,
   } = useAssets();
@@ -156,7 +155,12 @@ const AssetsPage: React.FC = () => {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {formatCurrency(asset.totalDeposits || 0)}
+                            {formatCurrency(
+                              asset?.deposits?.reduce(
+                                (acc, deposit) => acc + deposit.amount,
+                                0
+                              ) || 0
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             {getSavingsGoalName(asset.savingsGoalId)}

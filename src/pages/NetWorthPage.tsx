@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useAppContext } from "../context/AppContext";
 import {
   AreaChart,
   Area,
@@ -17,14 +16,18 @@ import {
 } from "../services/NetWorthHistory";
 import Card from "../components/cards/Card";
 import { Link } from "react-router-dom";
+import { useLiabilities } from "../hooks/useLiabilities";
+import { useAssets } from "../hooks/useAssets";
 
 const NetWorthPage: React.FC = () => {
-  const { assets, liabilities } = useAppContext();
+  const { liabilities } = useLiabilities();
+  const { assets } = useAssets();
+
   const [historyData, setHistoryData] = useState<NetWorthHistoryPoint[]>([]);
 
   useEffect(() => {
     // Calculate net worth history from asset historical values
-    const history = NetWorthHistoryService.getOrGenerateHistory(
+    const history = NetWorthHistoryService.getNetWorthHistory(
       assets,
       liabilities
     );
@@ -193,7 +196,7 @@ const NetWorthPage: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {assets.map((asset) => (
-                    <tr key={asset.id}>
+                    <tr key={asset._id}>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                         {asset.name}
                       </td>
@@ -245,7 +248,7 @@ const NetWorthPage: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {liabilities.map((liability) => (
-                    <tr key={liability.id}>
+                    <tr key={liability._id}>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                         {liability.name}
                       </td>

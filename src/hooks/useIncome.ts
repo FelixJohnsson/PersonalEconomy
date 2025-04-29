@@ -62,17 +62,15 @@ export const useIncome = () => {
 
     try {
       setIsLoading(true);
-      const updatedIncome = await apiRequest(
+      const incomes = await apiRequest(
         `/api/user-data/incomes/${income._id}`,
         "PUT",
         income
       );
 
-      setIncomes(
-        incomes.map((inc) => (inc._id === income._id ? updatedIncome : inc))
-      );
+      setIncomes(incomes);
 
-      return updatedIncome;
+      return incomes;
     } catch (err) {
       console.error("Error updating income:", err);
       setError("Failed to update income");
@@ -87,8 +85,11 @@ export const useIncome = () => {
 
     try {
       setIsLoading(true);
-      await apiRequest(`/api/user-data/incomes/${id}`, "DELETE");
-      setIncomes(incomes.filter((inc) => inc._id !== id));
+      const incomes = await apiRequest(
+        `/api/user-data/incomes/${id}`,
+        "DELETE"
+      );
+      setIncomes(incomes);
     } catch (err) {
       console.error("Error deleting income:", err);
       setError("Failed to delete income");

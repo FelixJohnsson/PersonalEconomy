@@ -1,12 +1,10 @@
 import React from "react";
-import { useAppContext } from "../context/AppContext";
 import { formatCurrency } from "../utils/formatters";
+import { useAssets } from "../hooks/useAssets";
 
 const AssetSummary: React.FC = () => {
-  const { assets, getFinancialSummary } = useAppContext();
+  const { assets } = useAssets();
   if (!assets) return null;
-
-  const { totalAssets } = getFinancialSummary();
 
   // Group assets by type
   const assetsByType = assets?.reduce((acc, asset) => {
@@ -58,7 +56,9 @@ const AssetSummary: React.FC = () => {
         <div className="flex justify-between mb-2">
           <p className="text-gray-600">Total Assets</p>
           <p className="text-xl font-bold text-green-600">
-            {formatCurrency(totalAssets)}
+            {formatCurrency(
+              assets.reduce((sum, asset) => sum + asset.value, 0)
+            )}
           </p>
         </div>
 
@@ -77,7 +77,13 @@ const AssetSummary: React.FC = () => {
               <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div
                   className="bg-blue-600 h-2.5 rounded-full"
-                  style={{ width: `${(total / totalAssets) * 100}%` }}
+                  style={{
+                    width: `${
+                      (total /
+                        assets.reduce((sum, asset) => sum + asset.value, 0)) *
+                      100
+                    }%`,
+                  }}
                 ></div>
               </div>
             </div>

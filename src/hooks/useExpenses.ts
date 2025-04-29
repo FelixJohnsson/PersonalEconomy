@@ -5,6 +5,7 @@ import {
   ExpenseFormData,
   NecessityLevel,
   EXPENSE_CATEGORIES,
+  Frequency,
 } from "../types";
 import { useAuth } from "../context/AuthContext";
 
@@ -54,6 +55,15 @@ export const useExpenses = () => {
 
     fetchExpenses();
   }, [isAuthenticated]);
+
+  const totalExpenses = useMemo(() => {
+    return expenses.reduce((acc, expense) => {
+      if (expense.category === "Savings") {
+        return acc;
+      }
+      return acc + expense.amount;
+    }, 0);
+  }, [expenses]);
 
   // CRUD operations for expenses
   const addExpense = async (expense: ExpenseFormData) => {
@@ -107,8 +117,8 @@ export const useExpenses = () => {
 
     try {
       setIsLoading(true);
-      await apiRequest(`/api/user-data/expenses/${id}`, "DELETE");
-      setExpenses(expenses.filter((exp) => exp._id !== id));
+      const user = await apiRequest(`/api/user-data/expenses/${id}`, "DELETE");
+      setExpenses(user.expenses);
     } catch (err) {
       console.error("Error deleting expense:", err);
       setError("Failed to delete expense");
@@ -352,9 +362,24 @@ export const useExpenses = () => {
     });
   }, []);
 
+  const importExpensesToUser = async () => {
+    try {
+      const response = await apiRequest(
+        "/api/user-data/expenses/import",
+        "POST"
+      );
+      console.log(response);
+    } catch (err) {
+      console.error("Error importing expenses:", err);
+      setError("Failed to import expenses");
+      throw err;
+    }
+  };
+
   return {
     // Data
     expenses,
+    totalExpenses,
     filteredExpenses,
     sortedExpenses,
     categories,
@@ -388,5 +413,6 @@ export const useExpenses = () => {
     getCategoryColor,
     getNecessityLevelColor,
     formatExpenseDate,
+    importExpensesToUser,
   };
 };

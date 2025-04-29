@@ -1,5 +1,5 @@
 import React from "react";
-import { Note } from "../../types/Note";
+import { Note } from "../../types";
 import { formatDate } from "../../utils/formatters";
 
 interface NoteCardProps {
@@ -25,7 +25,7 @@ const NoteCard: React.FC<NoteCardProps> = ({
         <h3 className="text-lg font-semibold">{note.title}</h3>
         <div className="flex space-x-2">
           <button
-            onClick={() => onTogglePin(note.id)}
+            onClick={() => onTogglePin(note._id)}
             className={`p-1 rounded-full hover:bg-gray-100 ${
               note.isPinned ? "text-blue-500" : "text-gray-400"
             }`}
@@ -55,7 +55,7 @@ const NoteCard: React.FC<NoteCardProps> = ({
             </svg>
           </button>
           <button
-            onClick={() => onDelete(note.id)}
+            onClick={() => onDelete(note._id)}
             className="p-1 rounded-full hover:bg-gray-100 text-red-500"
             title="Delete note"
           >

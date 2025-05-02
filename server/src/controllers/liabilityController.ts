@@ -99,9 +99,10 @@ const createLiability = asyncHandler(
         { $push: { liabilities: newLiability } }
       );
 
-      res.status(201).json(newLiability);
+      const updatedUser = await User.findById(user._id);
+
+      res.status(201).json(updatedUser?.liabilities || []);
     } catch (error: any) {
-      console.error("Error creating liability:", error);
       res.status(500).json({
         message: "Error creating liability",
         error: error.message,
@@ -210,10 +211,7 @@ const deleteLiability = asyncHandler(
 
       // Get updated liabilities list
       const updatedUser = await User.findById(req.user._id);
-      res.status(200).json({
-        message: "Liability removed",
-        liabilities: updatedUser?.liabilities || [],
-      });
+      res.status(200).json(updatedUser?.liabilities || []);
     } catch (error: any) {
       res.status(400).json({
         message: "Failed to delete liability",

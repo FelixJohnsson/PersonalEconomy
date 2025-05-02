@@ -85,6 +85,7 @@ export const useLiabilities = () => {
     try {
       setIsLoading(true);
       const updated = await liabilityApi.deleteLiability(liability);
+      console.warn("Updated liabilities", updated);
       setLiabilities(updated);
     } catch (err) {
       console.error("Error deleting liability:", err);
@@ -97,6 +98,9 @@ export const useLiabilities = () => {
 
   // Get selected liability
   const selectedLiability = useMemo(() => {
+    if (liabilities.length === 0) return undefined;
+    console.warn("Selected liability", liabilities);
+    console.warn("Selected ID", selectedId);
     return liabilities.find((l) => l._id === selectedId);
   }, [liabilities, selectedId]);
 

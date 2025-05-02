@@ -1,9 +1,11 @@
 export type NecessityLevel = "F" | "E" | "D" | "C" | "B" | "A" | "A+";
 
 export const EXPENSE_CATEGORIES = [
+  "Savings",
   "Housing",
-  "Transportation",
+  "Debt Payments",
   "Food",
+  "Transportation",
   "Lunch",
   "Utilities",
   "Healthcare",
@@ -12,8 +14,6 @@ export const EXPENSE_CATEGORIES = [
   "Education",
   "Clothing",
   "Electronics",
-  "Debt Payments",
-  "Savings",
   "Gifts & Donations",
   "Travel",
   "Other",
